@@ -22,6 +22,8 @@ Video files are ignored by Git; copy your local clips into this folder before bu
 
 Filenames become move names: `cross_body_lead.mp4` appears as **Cross body lead**. Underscores become spaces and the first letter is capitalized. Discovery includes `.mp4`, `.m4v`, `.webm`, `.3gp`, and `.mkv` files; other raw resources are ignored. Actual playback support depends on the device and video codec.
 
+Display names use Android resource entry names, so release packaging can shorten APK file paths without changing move labels.
+
 Cards automatically extract a frame near the beginning of each video in the background. Separate thumbnail images are unnecessary. The grid uses three columns of rounded cards on a dark background. Each preview is 9:12 (width to height) and center-cropped to fill the card width without padding or letterboxing. Move names overlay the bottom of each preview on a translucent dark background and wrap to the height needed for the full name.
 
 The compact title, sound toggle, and search stay above a thin divider. The move grid scrolls within its own area below the header.

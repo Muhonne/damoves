@@ -9,5 +9,5 @@ internal fun discoverMoves(resources: Resources): List<Move> =
         val id = field.getInt(null)
         val value = TypedValue()
         resources.getValue(id, value, true)
-        moveFromVideo(value.string.toString().substringAfterLast('/'), id)
+        moveFromResource(resources.getResourceEntryName(id), value.string.toString(), id)
     }.sortedBy { it.name.lowercase(Locale.ROOT) }

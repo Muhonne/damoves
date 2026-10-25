@@ -13,6 +13,7 @@ Help dancers check dance-move videos quickly between songs. Prioritize finding a
 - Moves opened from a tile play once; dice selections loop the same move until closed. Keep the dice independent of the search filter.
 - Keep cards at 9:12 (width:height), with wrapping labels over the bottom of the thumbnail. Keep the header outside the scrolling grid and let the dice float over the grid.
 - Copy videos to `app/src/main/res/raw/`; discover moves automatically from bundled video filenames, with no manual registry. Card thumbnails come directly from video frames.
+- Derive move labels from resource entry names, never packaged file basenames: release packaging shortens resource paths. Verify readable move labels in the signed release.
 - Keep the UI minimal and dark. Refer to dance clips as moves; sound refers only to audio settings.
 - Update the README when setup or behavior changes.
 - See `docs/android-tooling.md` for Android Studio, JDK 25, SDK, emulator, and signed device installation workflows.

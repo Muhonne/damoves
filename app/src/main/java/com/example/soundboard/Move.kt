@@ -2,6 +2,10 @@ package com.example.soundboard
 
 data class Move(val name: String, val videoResId: Int)
 
+// Release packaging shortens file paths; the resource entry name retains the move name.
+internal fun moveFromResource(resourceName: String, packagedPath: String, resourceId: Int): Move? =
+    moveFromVideo("$resourceName.${packagedPath.substringAfterLast('.', "")}", resourceId)
+
 internal fun filterMoves(moves: List<Move>, query: String): List<Move> {
     val trimmedQuery = query.trim()
     return moves.filter { it.name.contains(trimmedQuery, ignoreCase = true) }

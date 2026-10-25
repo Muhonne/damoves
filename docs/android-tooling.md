@@ -7,7 +7,7 @@
 - Bundled Java: `~/.local/opt/android-studio/jbr` (JBR 25). Gradle daemon criteria pin Java 25; the app's bytecode target remains Java 17.
 - SDK: `~/Android/Sdk`. Platform 37 and build tools 36.0.0 are installed; AGP selects its required build tools.
 - Emulator: `Medium_Phone_API_37.0`, with KVM acceleration available on this workstation.
-- Physical device: Pixel 9a. Damoves 1.0 is installed as a signed, non-debuggable release with all 28 local videos bundled for offline use. It runs without Android Studio or a computer connection.
+- Physical device: Pixel 9a. Damoves is installed as a signed, non-debuggable release with all 28 local videos bundled for offline use. It runs without Android Studio or a computer connection.
 
 These paths describe this workstation; keep machine-specific SDK configuration in the ignored `local.properties`. On another machine, install Android Studio and the required SDK packages through its setup wizard and SDK Manager. Do not commit the SDK or IDE installation.
 
@@ -73,4 +73,4 @@ adb -s DEVICE_SERIAL install -r app/build/outputs/apk/release/app-release.apk
 adb -s DEVICE_SERIAL shell am start -n com.example.soundboard/.MainActivity
 ```
 
-The signature verification must succeed before installation. Without signing properties, Gradle produces an unsigned release APK instead. Installing future signed releases with `-r` preserves settings. The one-time switch from debug to release required uninstalling the old app and reset its local settings; this migration is already complete on the Pixel.
+The signature verification must succeed before installation. Check readable move labels in the signed release itself: release packaging shortens resource file paths, so labels must use resource entry names rather than APK basenames. Without signing properties, Gradle produces an unsigned release APK instead. Installing future signed releases with `-r` preserves settings. The one-time switch from debug to release required uninstalling the old app and reset its local settings; this migration is already complete on the Pixel.

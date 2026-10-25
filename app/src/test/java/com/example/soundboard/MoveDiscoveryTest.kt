@@ -6,6 +6,15 @@ import org.junit.Test
 
 class MoveDiscoveryTest {
     @Test
+    fun shortenedReleasePathsKeepOriginalMoveNames() {
+        assertEquals(Move("Inside turn rock go hip catch 2", 42),
+            moveFromResource("inside_turn_rock_go_hip_catch_2", "res/2E.mp4", 42))
+        assertEquals(Move("Carousel", 7),
+            moveFromResource("carousel", "res/_h.mp4", 7))
+        assertNull(moveFromResource("damoves_keep", "res/a.xml", 8))
+    }
+
+    @Test
     fun videoFilenameBecomesASentenceCaseMoveName() {
         assertEquals(Move("Cross body lead", 42), moveFromVideo("cross_body_lead.mp4", 42))
         assertEquals(Move("Turn", 7), moveFromVideo("turn.mp4", 7))
