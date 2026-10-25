@@ -1,12 +1,20 @@
 # Damoves
 
-A native Android video soundboard written in Kotlin using Android platform views and `VideoView`.
+Damoves is a native Android app for quickly checking dance-move videos between songs. Search for a move, tap its tile, and watch a short clip before returning to the dance floor.
 
-- Search the grid and tap a tile to play its bundled video once.
+The app uses Kotlin, Android platform views, and `VideoView`. Clips are bundled for offline playback.
+
+## Use
+
+- Search the grid by dance-move name and tap a tile to play its video once.
 - Playback closes on completion, Stop, or leaving the app.
 - The sound toggle persists across launches.
-- Videos live in `app/src/main/res/raw/`; thumbnails live in `app/src/main/res/drawable-nodpi/`.
-- Add clips to the list in `MainActivity.kt`.
+
+## Add dance moves
+
+Put short dance-move videos in `app/src/main/res/raw/` and their thumbnails in `app/src/main/res/drawable-nodpi/`. Register each move in the list in `MainActivity.kt` with a searchable name and its thumbnail and video resource IDs. Resource filenames must use lowercase letters, digits, and underscores.
+
+The bundled Kick, Snare, Horn, and Bell entries are sample clips. Replace them with dance-move videos for the intended use.
 
 ## Build
 
