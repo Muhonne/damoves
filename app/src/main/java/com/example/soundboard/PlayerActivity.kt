@@ -4,11 +4,11 @@ import android.app.Activity
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
-import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.Toast
 import android.widget.VideoView
 import android.view.Gravity
+import android.view.View
 
 class PlayerActivity : Activity() {
     private lateinit var videoView: VideoView
@@ -40,13 +40,13 @@ class PlayerActivity : Activity() {
             }
         }
         root.addView(videoView, FrameLayout.LayoutParams(-1, -1, Gravity.CENTER))
-        root.addView(Button(this).apply {
-            setText(R.string.stop)
-            setOnClickListener {
-                videoView.stopPlayback()
-                finish()
-            }
-        }, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.END))
+        val closePlayer = View.OnClickListener {
+            videoView.stopPlayback()
+            finish()
+        }
+        videoView.setOnClickListener(closePlayer)
+        videoView.contentDescription = getString(R.string.close_video)
+        root.setOnClickListener(closePlayer)
         setContentView(root)
         videoView.setVideoURI(Uri.parse("android.resource://$packageName/$videoResId"))
     }

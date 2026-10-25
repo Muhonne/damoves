@@ -7,12 +7,22 @@ The app uses Kotlin, Android platform views, and `VideoView`. Clips are bundled 
 ## Use
 
 - Search the grid by dance-move name and tap a tile to play its video once.
-- Playback closes on completion, Stop, or leaving the app.
+- Tap the video to close it and return to the grid. Playback also closes on completion or leaving the app.
+- Tap the floating dice button to play a random move from the full library, regardless of the search filter.
 - The sound toggle persists across launches.
 
 ## Add dance moves
 
-Put short dance-move videos in `app/src/main/res/raw/` and their thumbnails in `app/src/main/res/drawable-nodpi/`. Register each move in the list in `MainActivity.kt` with a searchable name and its thumbnail and video resource IDs. Resource filenames must use lowercase letters, digits, and underscores.
+1. Copy each dance-move video into **`app/src/main/res/raw/`**. Use MP4 with H.264 video and AAC audio for broad device compatibility. Use lowercase letters, digits, and underscores in filenames, for example `cross_body_lead.mp4`.
+2. Add an entry to `allMoves` in `app/src/main/java/com/example/soundboard/MainActivity.kt`:
+
+   ```kotlin
+   Move("Cross body lead", R.raw.cross_body_lead)
+   ```
+
+3. Rebuild and reinstall the app. Videos are bundled in the APK and work offline; copying a file alone does not add a tile.
+
+Cards automatically extract a frame near the beginning of each video in the background. Separate thumbnail images are unnecessary. The grid uses three columns of rounded cards on a dark background. Each preview is 9:16 for portrait video and center-cropped to fill the card width without padding or letterboxing; move names appear below the preview.
 
 The bundled Kick, Snare, Horn, and Bell entries are sample clips. Replace them with dance-move videos for the intended use.
 
@@ -42,4 +52,4 @@ Open the repository in Android Studio to build and run on a device or emulator.
 
 ## Device checks
 
-Verify each clip starts, preserves its aspect ratio, and closes on completion. Check Stop, Back, Home, rotation, mute persistence, and search restoration after rotation. A failed clip should show an error and close the player.
+Verify each clip starts, preserves its aspect ratio, and closes on completion. Check tap-to-close, Back, Home, rotation, mute persistence, and search restoration after rotation. A failed clip should show an error and close the player.
