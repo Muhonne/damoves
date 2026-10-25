@@ -19,13 +19,8 @@ import android.view.inputmethod.EditorInfo
 import android.widget.*
 
 class MainActivity : Activity() {
-    private val allMoves = listOf(
-        Move("Kick", R.raw.kick),
-        Move("Snare", R.raw.snare),
-        Move("Horn", R.raw.horn),
-        Move("Bell", R.raw.bell)
-    )
-    private var moves = allMoves
+    private lateinit var allMoves: List<Move>
+    private var moves = emptyList<Move>()
     private val adapter = MoveAdapter()
     private lateinit var searchInput: EditText
     private val thumbnails = mutableMapOf<Int, Bitmap>()
@@ -33,6 +28,8 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        allMoves = discoverMoves(resources)
+        moves = allMoves
         val root = FrameLayout(this).apply {
             setBackgroundColor(Color.rgb(16, 17, 20))
             applySystemInsets()
@@ -63,8 +60,7 @@ class MainActivity : Activity() {
             addTextChangedListener(object : TextWatcher {
                 override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
                 override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                    val query = s.toString().trim()
-                    moves = allMoves.filter { it.name.contains(query, ignoreCase = true) }
+                    moves = filterMoves(allMoves, s.toString())
                     adapter.notifyDataSetChanged()
                 }
                 override fun afterTextChanged(s: Editable?) {}

@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Videos are discovered by resource ID at runtime rather than direct R.raw references. -->
+<resources xmlns:tools="http://schemas.android.com/tools" tools:keep="@raw/*" />
