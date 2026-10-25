@@ -2,6 +2,13 @@ plugins {
     id "com.android.application"
 }
 
+def releaseSigningFile = file(providers.gradleProperty("damovesSigningProperties")
+    .getOrElse("${System.getProperty('user.home')}/.local/share/damoves/signing/release.properties"))
+def releaseSigning = new Properties()
+if (releaseSigningFile.isFile()) {
+    releaseSigningFile.withInputStream { releaseSigning.load(it) }
+}
+
 android {
     namespace "com.example.soundboard"
     compileSdk 37
@@ -17,6 +24,25 @@ android {
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
+    }
+
+    signingConfigs {
+        if (!releaseSigning.isEmpty()) {
+            release {
+                storeFile file(releaseSigning.getProperty("storeFile"))
+                storePassword releaseSigning.getProperty("storePassword")
+                keyAlias releaseSigning.getProperty("keyAlias")
+                keyPassword releaseSigning.getProperty("keyPassword")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            if (!releaseSigning.isEmpty()) {
+                signingConfig signingConfigs.release
+            }
+        }
     }
 }
 

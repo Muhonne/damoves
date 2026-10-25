@@ -16,6 +16,7 @@ class PlayerActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val videoResId = intent.getIntExtra(VIDEO_EXTRA, 0)
+        val loop = intent.getBooleanExtra(LOOP_EXTRA, false)
         if (videoResId == 0) {
             finish()
             return
@@ -30,9 +31,10 @@ class PlayerActivity : Activity() {
                     .getBoolean(MainActivity.KEY_SOUND_ENABLED, true)
                 val volume = if (enabled) 1f else 0f
                 player.setVolume(volume, volume)
+                player.isLooping = loop
                 start()
             }
-            setOnCompletionListener { finish() }
+            setOnCompletionListener { if (!loop) finish() }
             setOnErrorListener { _, _, _ ->
                 Toast.makeText(this@PlayerActivity, R.string.playback_error, Toast.LENGTH_SHORT).show()
                 finish()
@@ -59,5 +61,6 @@ class PlayerActivity : Activity() {
 
     companion object {
         const val VIDEO_EXTRA = "video"
+        const val LOOP_EXTRA = "loop"
     }
 }

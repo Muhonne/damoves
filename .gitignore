@@ -1,6 +1,18 @@
 .gradle/
+.kotlin/
 build/
 */build/
 local.properties
 *.iml
 .idea/
+*.jks
+*.keystore
+*.p12
+release.properties
+
+# Local dance-move videos
+*.[mM][pP]4
+*.[mM]4[vV]
+*.[wW][eE][bB][mM]
+*.3[gG][pP]
+*.[mM][kK][vV]
