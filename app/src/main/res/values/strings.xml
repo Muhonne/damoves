@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Soundboard</string>
+    <string name="sound_on">Sound on</string>
+    <string name="sound_off">Sound off</string>
+    <string name="search_hint">Search sounds</string>
+    <string name="stop">Stop</string>
+    <string name="playback_error">Unable to play this clip</string>
+</resources>
