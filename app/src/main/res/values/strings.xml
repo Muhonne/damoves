@@ -7,4 +7,14 @@
     <string name="close_video">Close video</string>
     <string name="playback_error">Unable to play this clip</string>
     <string name="play_random_move">Play random move</string>
+    <string name="add_clip">Add clip</string>
+    <string name="edit_clip">Edit clip</string>
+    <string name="delete_clip">Delete</string>
+    <string name="delete_clip_title">Delete clip</string>
+    <string name="delete_clip_message">Delete this clip? The original video stays where it is.</string>
+    <string name="cancel">Cancel</string>
+    <string name="no_moves_found">No moves found</string>
+    <string name="clear_search">Clear search</string>
+    <string name="add_clip_content_description">Add clip</string>
+    <string name="toggle_sound_content_description">Toggle sound</string>
 </resources>

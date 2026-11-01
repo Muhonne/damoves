@@ -1,11 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="AppTheme" parent="@android:style/Theme.Material.NoActionBar">
+    <style name="AppTheme" parent="@style/Theme.Material3.Dark.NoActionBar">
         <item name="android:fontFamily">sans</item>
         <item name="android:windowLightStatusBar">false</item>
-        <item name="android:windowBackground">#101114</item>
-        <item name="android:statusBarColor">#101114</item>
-        <item name="android:navigationBarColor">#101114</item>
-        <item name="android:colorAccent">#A6B4D6</item>
+        <item name="android:windowBackground">@color/surface</item>
+        <item name="android:statusBarColor">@color/surface</item>
+        <item name="android:navigationBarColor">@color/surface</item>
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorOnPrimary">@color/on_primary</item>
+        <item name="colorPrimaryContainer">@color/primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/on_primary_container</item>
+        <item name="colorSurface">@color/surface</item>
+        <item name="colorSurfaceContainer">@color/surface_container</item>
+        <item name="colorSurfaceContainerHigh">@color/surface_container_high</item>
+        <item name="colorOutline">@color/outline</item>
+        <item name="colorOnSurface">@color/text_primary</item>
+        <item name="colorOnSurfaceVariant">@color/text_secondary</item>
+        <item name="colorError">@color/danger</item>
+        <item name="colorAccent">@color/primary</item>
     </style>
 </resources>

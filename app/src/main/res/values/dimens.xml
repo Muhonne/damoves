@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="space_1">4dp</dimen>
+    <dimen name="space_2">8dp</dimen>
+    <dimen name="space_3">12dp</dimen>
+    <dimen name="space_4">16dp</dimen>
+    <dimen name="space_6">24dp</dimen>
+    <dimen name="space_9">36dp</dimen>
+    <dimen name="touch_target">48dp</dimen>
+    <dimen name="fab_size">56dp</dimen>
+</resources>
