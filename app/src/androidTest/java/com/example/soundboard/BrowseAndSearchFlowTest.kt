@@ -55,7 +55,22 @@ class BrowseAndSearchFlowTest {
     fun querySurvivesRecreation() {
         onView(withId(R.id.searchInput)).perform(typeText("carousel"), closeSoftKeyboard())
         activityRule.scenario.recreate()
-        onView(withText("Carousel")).check(matches(isDisplayed()))
+        eventually {
+            onView(withText("Carousel")).check(matches(isDisplayed()))
+        }
+    }
+
+    private fun eventually(timeoutMs: Long = 5_000, block: () -> Unit) {
+        val deadline = android.os.SystemClock.uptimeMillis() + timeoutMs
+        while (true) {
+            try {
+                block()
+                return
+            } catch (failure: Throwable) {
+                if (android.os.SystemClock.uptimeMillis() > deadline) throw failure
+                Thread.sleep(100)
+            }
+        }
     }
 
     @Test

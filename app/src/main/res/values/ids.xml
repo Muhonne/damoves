@@ -20,4 +20,5 @@
     <item name="importNudgeEndMinus" type="id" />
     <item name="importNudgeEndPlus" type="id" />
     <item name="importSaveButton" type="id" />
+    <item name="renameInput" type="id" />
 </resources>

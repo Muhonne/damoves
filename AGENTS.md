@@ -12,7 +12,7 @@ Help dancers check dance-move videos quickly between songs. Prioritize finding a
 - Stop and release playback when leaving the player. Preserve video aspect ratio and the sound preference.
 - Moves opened from a tile play once; dice selections loop the same move until closed. Keep the dice independent of the search filter.
 - Keep cards at 9:12 (width:height), with wrapping labels over the bottom of the thumbnail. Keep the header outside the scrolling grid and let the dice float over the grid.
-- Copy videos to `app/src/main/res/raw/`; discover moves automatically from bundled video filenames, with no manual registry. Card thumbnails come directly from video frames.
+- Copy videos to `app/src/main/res/raw/`; discover moves automatically from bundled video filenames, with no manual registry. Card thumbnails come directly from video frames and are cached on disk for fast repaints.
 - Derive move labels from resource entry names, never packaged file basenames: release packaging shortens resource paths. Verify readable move labels in the signed release.
 - Keep the UI minimal and dark. Refer to dance clips as moves; sound refers only to audio settings.
 - Update the [README](README.md) for setup changes and [User flows](docs/userflows.md) for behavior changes.

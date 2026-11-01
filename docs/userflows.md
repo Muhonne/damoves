@@ -4,7 +4,7 @@ How Damoves behaves from the dancer's side, screen by screen. The [README](../RE
 
 ## Browse and search moves
 
-1. The app opens on a three-column grid of rounded cards, each showing a frame from the clip with the move name wrapped over the bottom.
+1. The app opens on a three-column grid of rounded cards, each showing a frame from the clip with the move name wrapped over the bottom. Frames are cached on disk, so the grid paints instantly on later launches.
 2. Type in the search box to filter by name. Matching is partial and case-insensitive, and the query survives rotation.
 3. The header, sound toggle, and search box stay fixed; the grid scrolls beneath them, with enough padding that the last row clears the floating dice.
 
@@ -45,11 +45,10 @@ The selection cannot be inverted: the start stays at least one step below the en
 
 The importer closes and the new move joins the grid, search, and dice selections, available offline like bundled moves. It is stored privately in the app: uninstalling Damoves removes imported moves.
 
-## Manage imported clips
+## Manage clips
 
-1. Press and hold an imported tile to open a bottom sheet with its options. Bundled moves shipped in the app do not respond, because they cannot be changed or removed.
-2. **Edit clip** re-opens that clip in the importer with its current name filled in, so you can adjust the range and save again.
-3. **Delete** asks for confirmation, then removes the clip and its name from the app.
+1. Press and hold any tile to open a bottom sheet. Every move offers **Rename**, which updates the name shown in the grid, search, and player; a renamed bundled move keeps its new name on this device.
+2. Imported tiles also offer **Edit clip**, which re-opens that clip in the importer with its current name filled in, and **Delete**, which asks for confirmation before removing the clip and its name from the app.
 
 Editing works on the app's own trimmed copy, not the original gallery video: the app keeps no link back to the source file. Saving from the editor always writes a new move, so a re-trim leaves the earlier one in place until you delete it. Deleting an imported clip never touches the original video, which stays where it is.
 

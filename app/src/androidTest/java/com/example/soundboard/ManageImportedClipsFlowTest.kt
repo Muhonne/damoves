@@ -6,6 +6,7 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.action.ViewActions.longClick
+import androidx.test.espresso.action.ViewActions.replaceText
 import androidx.test.espresso.assertion.ViewAssertions.doesNotExist
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.contrib.RecyclerViewActions
@@ -45,6 +46,9 @@ class ManageImportedClipsFlowTest {
         context.getSharedPreferences("imports", Context.MODE_PRIVATE).edit()
             .remove(importedId)
             .commit()
+        context.getSharedPreferences("renames", Context.MODE_PRIVATE).edit()
+            .clear()
+            .commit()
     }
 
     private fun longPressTile(name: String) {
@@ -78,11 +82,34 @@ class ManageImportedClipsFlowTest {
     }
 
     @Test
-    fun longPressBundledTileIsInert() {
+    fun longPressBundledTileOffersRename() {
         ActivityScenario.launch(MainActivity::class.java).use {
             longPressTile("Carousel")
+            onView(withText("Rename")).check(matches(isDisplayed()))
             onView(withText("Edit clip")).check(doesNotExist())
-            onView(withId(R.id.moveGrid)).check(matches(isDisplayed()))
+            onView(withText("Delete from Damoves")).check(doesNotExist())
+        }
+    }
+
+    @Test
+    fun renamingAnImportedClipUpdatesTheTile() {
+        ActivityScenario.launch(MainActivity::class.java).use {
+            longPressTile("Test import")
+            onView(withText("Rename")).perform(click())
+            onView(withId(R.id.renameInput)).perform(replaceText("Renamed import"))
+            onView(withText("Save")).perform(click())
+            onView(withText("Renamed import")).check(matches(isDisplayed()))
+        }
+    }
+
+    @Test
+    fun renamingABundledClipUpdatesTheTile() {
+        ActivityScenario.launch(MainActivity::class.java).use {
+            longPressTile("Carousel")
+            onView(withText("Rename")).perform(click())
+            onView(withId(R.id.renameInput)).perform(replaceText("Renamed carousel"))
+            onView(withText("Save")).perform(click())
+            onView(withText("Renamed carousel")).check(matches(isDisplayed()))
         }
     }
 }

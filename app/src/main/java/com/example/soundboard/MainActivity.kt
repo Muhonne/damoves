@@ -41,11 +41,12 @@ class MainActivity : Activity() {
     private lateinit var soundToggle: ImageButton
     private lateinit var emptyState: View
     private val thumbnails = mutableMapOf<Move, Bitmap>()
-    private val thumbnailWorker = Executors.newSingleThreadExecutor()
+    private val thumbnailsLoading = java.util.Collections.synchronizedSet(mutableSetOf<Move>())
+    private val thumbnailWorker = Executors.newFixedThreadPool(3)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        allMoves = discoverMoves(resources) + SavedMoves.load(this)
+        allMoves = loadMoves()
         moves = allMoves
         adapter = MoveAdapter()
         val root = FrameLayout(this).apply {
@@ -197,7 +198,7 @@ class MainActivity : Activity() {
     }
 
     private fun reloadMoves() {
-        allMoves = discoverMoves(resources) + SavedMoves.load(this)
+        allMoves = loadMoves()
         moves = filterMoves(allMoves, searchInput.text.toString())
         adapter.submitList(moves)
         updateEmptyState()
@@ -248,8 +249,16 @@ class MainActivity : Activity() {
         soundToggle.contentDescription = getString(if (enabled) R.string.sound_on else R.string.sound_off)
     }
 
+    private fun loadMoves(): List<Move> {
+        val renames = getSharedPreferences(RENAMES_PREFS, MODE_PRIVATE)
+        val bundled = discoverMoves(resources).map { move ->
+            val renamed = renames.getString(move.videoResId.toString(), null)
+            if (renamed != null) Move(renamed, move.videoResId) else move
+        }
+        return bundled + SavedMoves.load(this)
+    }
+
     private fun showMoveOptions(move: Move) {
-        val uri = move.uri ?: return
         val sheet = BottomSheetDialog(this)
         val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -262,18 +271,62 @@ class MainActivity : Activity() {
             setTextColor(getColor(R.color.text_primary))
             setPadding(dp(8), dp(16), dp(8), dp(8))
         })
-        content.addView(sheetRow(R.drawable.ic_edit, R.string.edit_clip, R.color.text_primary) {
+        content.addView(sheetRow(R.drawable.ic_edit, R.string.rename, R.color.text_primary) {
             sheet.dismiss()
-            startActivity(Intent(this, ImportActivity::class.java)
-                .setData(Uri.parse(uri))
-                .putExtra(ImportActivity.NAME_EXTRA, move.name))
+            showRenameDialog(move)
         })
-        content.addView(sheetRow(R.drawable.ic_delete, R.string.delete_from_damoves, R.color.danger) {
-            sheet.dismiss()
-            confirmDelete(move)
-        })
+        val uri = move.uri
+        if (uri != null) {
+            content.addView(sheetRow(R.drawable.ic_cut, R.string.edit_clip, R.color.text_primary) {
+                sheet.dismiss()
+                startActivity(Intent(this, ImportActivity::class.java)
+                    .setData(Uri.parse(uri))
+                    .putExtra(ImportActivity.NAME_EXTRA, move.name))
+            })
+            content.addView(sheetRow(R.drawable.ic_delete, R.string.delete_from_damoves, R.color.danger) {
+                sheet.dismiss()
+                confirmDelete(move)
+            })
+        }
         sheet.setContentView(content)
         sheet.show()
+    }
+
+    private fun showRenameDialog(move: Move) {
+        val input = EditText(this).apply {
+            id = R.id.renameInput
+            setText(move.name)
+            setSelection(text.length)
+            setSingleLine()
+            setTextColor(getColor(R.color.text_primary))
+            setHintTextColor(getColor(R.color.text_secondary))
+        }
+        val container = FrameLayout(this).apply {
+            setPadding(dp(24), dp(8), dp(24), 0)
+            addView(input, FrameLayout.LayoutParams(-1, -2))
+        }
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.rename_clip)
+            .setView(container)
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.save) { _, _ ->
+                val name = input.text.toString().trim()
+                if (name.isNotEmpty()) renameMove(move, name)
+            }
+            .show()
+    }
+
+    private fun renameMove(move: Move, name: String) {
+        val uri = move.uri
+        if (uri != null) {
+            val id = importedMoveId(uri) ?: return
+            getSharedPreferences("imports", MODE_PRIVATE).edit().putString(id, name).apply()
+        } else {
+            getSharedPreferences(RENAMES_PREFS, MODE_PRIVATE).edit()
+                .putString(move.videoResId.toString(), name)
+                .apply()
+        }
+        reloadMoves()
     }
 
     private fun sheetRow(icon: Int, label: Int, tint: Int, onClick: () -> Unit) =
@@ -344,34 +397,51 @@ class MainActivity : Activity() {
     }
 
     private fun loadThumbnails() {
-        thumbnailWorker.execute {
-            for (move in allMoves) {
-                if (Thread.currentThread().isInterrupted) break
-                if (thumbnails.containsKey(move)) continue
-                val retriever = MediaMetadataRetriever()
-                try {
-                    if (move.uri != null) retriever.setDataSource(this, Uri.parse(move.uri))
-                    else resources.openRawResourceFd(move.videoResId).use { descriptor ->
-                        retriever.setDataSource(descriptor.fileDescriptor, descriptor.startOffset, descriptor.length)
-                    }
-                    val frame = if (Build.VERSION.SDK_INT >= 27) {
-                        retriever.getScaledFrameAtTime(500_000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC, 360, 640)
-                    } else {
-                        retriever.getFrameAtTime(500_000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
-                    }
-                    if (frame != null) runOnUiThread {
-                        if (!isDestroyed) {
-                            thumbnails[move] = frame
-                            val position = adapter.currentList.indexOf(move)
-                            if (position >= 0) adapter.notifyItemChanged(position)
-                        }
-                    }
-                } catch (exception: Exception) {
-                    Log.w("Damoves", "Cannot load thumbnail for ${move.name}", exception)
-                } finally {
-                    retriever.release()
-                }
+        for (move in allMoves) {
+            if (thumbnails.containsKey(move) || !thumbnailsLoading.add(move)) continue
+            thumbnailWorker.execute { loadOrExtractThumbnail(move) }
+        }
+    }
+
+    private fun loadOrExtractThumbnail(move: Move) {
+        if (Thread.currentThread().isInterrupted) return
+        try {
+            val cached = ThumbnailStore.load(this, move)
+            if (cached != null) {
+                publishThumbnail(move, cached)
+                return
             }
+            val retriever = MediaMetadataRetriever()
+            try {
+                if (move.uri != null) retriever.setDataSource(this, Uri.parse(move.uri))
+                else resources.openRawResourceFd(move.videoResId).use { descriptor ->
+                    retriever.setDataSource(descriptor.fileDescriptor, descriptor.startOffset, descriptor.length)
+                }
+                val frame = if (Build.VERSION.SDK_INT >= 27) {
+                    retriever.getScaledFrameAtTime(500_000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC, 360, 640)
+                } else {
+                    retriever.getFrameAtTime(500_000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                }
+                if (frame != null) {
+                    ThumbnailStore.save(this, move, frame)
+                    publishThumbnail(move, frame)
+                }
+            } finally {
+                retriever.release()
+            }
+        } catch (exception: Exception) {
+            Log.w("Damoves", "Cannot load thumbnail for ${move.name}", exception)
+        } finally {
+            thumbnailsLoading.remove(move)
+        }
+    }
+
+    private fun publishThumbnail(move: Move, bitmap: Bitmap) {
+        runOnUiThread {
+            if (isDestroyed) return@runOnUiThread
+            thumbnails[move] = bitmap
+            val position = adapter.currentList.indexOf(move)
+            if (position >= 0) adapter.notifyItemChanged(position)
         }
     }
 
@@ -405,6 +475,7 @@ class MainActivity : Activity() {
     companion object {
         const val SOUND_PREFS = "soundboard"
         const val KEY_SOUND_ENABLED = "sound_enabled"
+        private const val RENAMES_PREFS = "renames"
 
         private val MoveDiff = object : DiffUtil.ItemCallback<Move>() {
             override fun areItemsTheSame(oldItem: Move, newItem: Move) =

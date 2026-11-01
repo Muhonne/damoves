@@ -19,4 +19,7 @@
     <string name="toggle_sound_content_description">Toggle sound</string>
     <string name="imported_badge">Imported</string>
     <string name="delete_from_damoves">Delete from Damoves</string>
+    <string name="rename">Rename</string>
+    <string name="rename_clip">Rename move</string>
+    <string name="save">Save</string>
 </resources>
