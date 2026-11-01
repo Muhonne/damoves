@@ -13,6 +13,13 @@ class ClipTimeline(context: Context) : View(context) {
     var duration = 1
     var start = 0
     var end = 1
+    var position = 0
+        set(value) {
+            if (field != value) {
+                field = value
+                invalidate()
+            }
+        }
     var onChange: ((Boolean) -> Unit)? = null
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private var draggingStart = true
@@ -36,6 +43,11 @@ class ClipTimeline(context: Context) : View(context) {
         paint.style = Paint.Style.FILL
         canvas.drawCircle(a, y, 12f * density, paint)
         canvas.drawCircle(b, y, 12f * density, paint)
+        val playhead = left + span * position.coerceIn(0, duration) / duration
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 3f * density
+        paint.color = context.getColor(R.color.text_primary)
+        canvas.drawLine(playhead, y - 16f * density, playhead, y + 16f * density, paint)
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {

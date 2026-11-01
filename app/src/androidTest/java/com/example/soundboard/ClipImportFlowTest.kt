@@ -79,9 +79,27 @@ class ClipImportFlowTest {
         launchImporter().use {
             waitForPreparedRange()
             onView(withId(R.id.importPreviewButton)).perform(click())
-            onView(withText("Pause preview")).check(matches(isDisplayed()))
+            onView(withText("Pause")).check(matches(isDisplayed()))
             onView(withId(R.id.importPreviewButton)).perform(click())
-            onView(withText("Preview selection")).check(matches(isDisplayed()))
+            onView(withText("Play")).check(matches(isDisplayed()))
+        }
+    }
+
+    @Test
+    fun playheadFollowsPlayback() {
+        launchImporter().use {
+            waitForPreparedRange()
+            onView(withId(R.id.importPreviewButton)).perform(click())
+            var position = 0
+            for (attempt in 0 until 100) {
+                onView(withId(R.id.importTimeline)).check { view, _ ->
+                    position = (view as ClipTimeline).position
+                }
+                if (position > 0) break
+                Thread.sleep(100)
+            }
+            assertTrue("Playhead did not advance, position=$position", position > 0)
+            onView(withId(R.id.importPreviewButton)).perform(click())
         }
     }
 

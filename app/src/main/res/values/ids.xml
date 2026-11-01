@@ -10,6 +10,7 @@
     <item name="clearSearchButton" type="id" />
     <item name="dice" type="id" />
     <item name="importRangeLabel" type="id" />
+    <item name="importTimeline" type="id" />
     <item name="importNameInput" type="id" />
     <item name="importPreviewButton" type="id" />
     <item name="importRewind" type="id" />

@@ -28,11 +28,16 @@ class ImportActivity : Activity() {
     private val handler = android.os.Handler(android.os.Looper.getMainLooper())
     private val checkRange = object : Runnable {
         override fun run() {
-            if (editing && previewing && videoView.currentPosition >= timeline.end) {
-                previewing = false
-                videoView.pause()
-                videoView.seekTo(timeline.start)
-                updatePreviewButton()
+            if (editing) {
+                if (previewing && videoView.currentPosition >= timeline.end) {
+                    previewing = false
+                    videoView.pause()
+                    videoView.seekTo(timeline.start)
+                    timeline.position = timeline.start
+                    updatePreviewButton()
+                } else if (previewing) {
+                    timeline.position = videoView.currentPosition
+                }
             }
             handler.postDelayed(this, 20)
         }
@@ -42,6 +47,7 @@ class ImportActivity : Activity() {
         previewing = false
         videoView.pause()
         videoView.seekTo(if (startChanged) timeline.start else (timeline.end - 1).coerceAtLeast(0))
+        timeline.position = videoView.currentPosition
         rangeLabel.text = java.lang.String.format(java.util.Locale.US,
             "Start %.2f s  —  End %.2f s", timeline.start / 1000.0, timeline.end / 1000.0)
         timeline.invalidate()
@@ -50,13 +56,14 @@ class ImportActivity : Activity() {
 
     private fun updatePreviewButton() {
         if (!::previewButton.isInitialized) return
-        previewButton.text = if (previewing) "Pause preview" else "Preview selection"
+        previewButton.text = if (previewing) "Pause" else "Play"
     }
 
     private fun seekBy(deltaMs: Int) {
         val duration = videoView.duration
         if (duration <= 0) return
         videoView.seekTo((videoView.currentPosition + deltaMs).coerceIn(0, duration))
+        timeline.position = videoView.currentPosition
         window.decorView.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
     }
 
@@ -201,6 +208,7 @@ class ImportActivity : Activity() {
             setPadding(dp(12), dp(8), dp(12), dp(8))
         }
         timeline = ClipTimeline(this).apply {
+            id = R.id.importTimeline
             contentDescription = "Clip start and end; use the buttons below for fine adjustment"
             onChange = { updateRange(it) }
         }
@@ -219,7 +227,7 @@ class ImportActivity : Activity() {
         val previewRow = LinearLayout(this)
         previewRow.addView(outlinedButton("−5s", R.id.importRewind) { seekBy(-5000) },
             LinearLayout.LayoutParams(0, -2, 1f))
-        previewButton = filledButton("Preview selection", R.id.importPreviewButton).apply {
+        previewButton = filledButton("Play", R.id.importPreviewButton).apply {
             setOnClickListener {
                 if (previewing) {
                     previewing = false

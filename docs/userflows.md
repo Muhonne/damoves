@@ -26,7 +26,7 @@ Reached from **Add clip**. The system gallery/document picker supplies the video
 
 1. **Pick a clip.** The picker opens the video file directly in the importer. If a clip cannot be played, an error is shown and the importer closes.
 2. **Choose a range.** Drag either handle on the two-handle timeline; the label above reads `Start x.xx s — End y.yy s`.
-3. **Preview the selection.** **Preview selection** plays from the range start and stops at the range end, returning to the start. Tap it again, or let it reach the end, to go back to **Preview selection**.
+3. **Play the selection.** **Play** starts from the range start and **Pause** stops it; when the playhead reaches the range end it returns to the start. The playhead line on the timeline follows the video.
 4. **Scrub the video.** **−5s** and **+5s** move the playhead five seconds, clamped to the clip.
 5. **Fine-tune.** **Start −**, **Start +**, **End −**, and **End +** nudge by 0.5 seconds. Press and hold to keep adjusting until you release.
 6. **Name and save.** Type a move name, then tap **Save move**. While the trim is written, the button disables and reads `Saving…`.
