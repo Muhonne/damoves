@@ -47,7 +47,7 @@ The importer closes and the new move joins the grid, search, and dice selections
 
 ## Manage imported clips
 
-1. Press and hold an imported tile to open its options. Bundled moves shipped in the app do not respond, because they cannot be changed or removed.
+1. Press and hold an imported tile to open a bottom sheet with its options. Bundled moves shipped in the app do not respond, because they cannot be changed or removed.
 2. **Edit clip** re-opens that clip in the importer with its current name filled in, so you can adjust the range and save again.
 3. **Delete** asks for confirmation, then removes the clip and its name from the app.
 

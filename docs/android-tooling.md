@@ -54,6 +54,8 @@ adb -s DEVICE_SERIAL shell am start -n com.example.soundboard/.MainActivity
 
 Select the target explicitly when both the emulator and phone are connected. Use the emulator for debug builds: the Pixel's installed release uses a different signing key, so a debug APK cannot update it. Do not uninstall the Pixel release just to run a debug build unless resetting its local data is intended.
 
+Run the Espresso flow suites against the emulator with `./gradlew :app:connectedDebugAndroidTest`. The Google Play system image can remove an adb-installed app shortly after instrumentation ends, so reinstall the debug APK before manual checks if the launcher no longer shows it.
+
 ## Release updates for the Pixel
 
 Signing material is stored outside the repository in `~/.local/share/damoves/signing/`:

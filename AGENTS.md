@@ -25,7 +25,7 @@ Help dancers check dance-move videos quickly between songs. Prioritize finding a
 
 ## Validation
 
-Run `./gradlew :app:testDebugUnitTest :app:assembleDebug :app:lintDebug` for code or build changes. For playback or UI changes, check affected behavior on a device or emulator, including completion, tap-to-close, Back, Home, search, rotation, and mute persistence.
+Run `./gradlew :app:testDebugUnitTest :app:assembleDebug :app:lintDebug` for code or build changes. For playback or UI changes, also run `./gradlew :app:connectedDebugAndroidTest` with an emulator or device attached; the Espresso suites cover browsing, search, imported-clip actions, the importer, tile playback, and the dice. Check affected behavior on the device too, including completion, tap-to-close, Back, Home, search, rotation, mute persistence, the long-press sheet, deletion, and importer scrubbing.
 For release/signing changes, also run `./gradlew :app:assembleRelease :app:lintRelease` and verify the APK signature. Keep release signing material outside the repository.
 
 ## Git

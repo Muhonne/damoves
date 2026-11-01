@@ -68,11 +68,13 @@ Without signing properties, the release APK is unsigned. A release signed with a
 - Gradle daemon JVM 25, pinned in `gradle/gradle-daemon-jvm.properties`
 - Compile/target SDK 37; minimum SDK 26 (Android 8.0)
 - JVM bytecode target 17
-- Kotlin standard library; no third-party UI or playback libraries
+- Kotlin standard library, Material Components (`com.google.android.material`), and RecyclerView; playback uses the platform `VideoView`
 
 ## Tests
 
-`app/src/test/` contains JVM unit tests for move search and filename discovery. They cover partial and case-insensitive matching, whitespace, blank queries, no results, display names, supported extensions, and ignoring non-video files. JUnit is a test-only dependency; these tests do not require an emulator.
+`app/src/test/` contains JVM unit tests for move search, filename discovery, and imported-move ids. They cover partial and case-insensitive matching, whitespace, blank queries, no results, display names, supported extensions, ignoring non-video files, and rejecting malformed import URIs. JUnit is a test-only dependency; these tests do not require an emulator.
+
+`app/src/androidTest/` contains Espresso user-flow suites for browsing and search, imported-clip actions, the clip importer, tile playback, and the dice. Run them on an emulator or device with `./gradlew :app:connectedDebugAndroidTest`.
 
 ## Device checks
 
