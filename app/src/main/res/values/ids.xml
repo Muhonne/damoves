@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="soundToggle" type="id" />
+    <item name="addClip" type="id" />
+    <item name="searchContainer" type="id" />
+    <item name="searchInput" type="id" />
+    <item name="clearSearch" type="id" />
+    <item name="moveGrid" type="id" />
+    <item name="emptyState" type="id" />
+    <item name="clearSearchButton" type="id" />
+    <item name="dice" type="id" />
+</resources>

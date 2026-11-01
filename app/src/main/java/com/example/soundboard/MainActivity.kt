@@ -3,27 +3,41 @@ package com.example.soundboard
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
-import android.graphics.Color
+import android.content.res.ColorStateList
 import android.graphics.Bitmap
-import android.graphics.drawable.GradientDrawable
+import android.graphics.Typeface
+import android.graphics.drawable.Drawable
 import android.media.MediaMetadataRetriever
-import android.util.Log
-import java.util.concurrent.Executors
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.text.Editable
 import android.text.InputType
 import android.text.TextWatcher
+import android.util.Log
+import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.widget.*
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.GridLayoutManager
+import androidx.recyclerview.widget.ListAdapter
+import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.floatingactionbutton.FloatingActionButton
+import java.util.concurrent.Executors
 
 class MainActivity : Activity() {
     private lateinit var allMoves: List<Move>
     private var moves = emptyList<Move>()
-    private val adapter = MoveAdapter()
+    private lateinit var adapter: MoveAdapter
+    private lateinit var recyclerView: RecyclerView
     private lateinit var searchInput: EditText
+    private lateinit var clearSearch: ImageButton
+    private lateinit var soundToggle: ImageButton
+    private lateinit var emptyState: View
     private val thumbnails = mutableMapOf<Move, Bitmap>()
     private val thumbnailWorker = Executors.newSingleThreadExecutor()
 
@@ -31,8 +45,9 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         allMoves = discoverMoves(resources) + SavedMoves.load(this)
         moves = allMoves
+        adapter = MoveAdapter()
         val root = FrameLayout(this).apply {
-            setBackgroundColor(Color.rgb(16, 17, 20))
+            setBackgroundColor(getColor(R.color.surface))
             applySystemInsets()
         }
         val content = LinearLayout(this).apply {
@@ -41,110 +56,137 @@ class MainActivity : Activity() {
         val headerSection = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(16), 0, dp(16), dp(12))
-            setBackgroundColor(Color.rgb(16, 17, 20))
+            setBackgroundColor(getColor(R.color.surface))
         }
-        val header = LinearLayout(this).apply {
+        val appBar = LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL
+            minimumHeight = dp(56)
         }
-        header.addView(TextView(this).apply {
+        appBar.addView(TextView(this).apply {
             setText(R.string.app_name)
             textSize = 20f
             gravity = Gravity.CENTER_VERTICAL
-            setTextColor(Color.WHITE)
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
-        }, LinearLayout.LayoutParams(0, dp(48), 1f))
-        val search = EditText(this).apply {
+            setTextColor(getColor(R.color.text_primary))
+            typeface = Typeface.DEFAULT_BOLD
+        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        soundToggle = ImageButton(this).apply {
+            id = R.id.soundToggle
+            background = borderlessRipple()
+            scaleType = ImageView.ScaleType.CENTER_INSIDE
+            setOnClickListener { toggleSound() }
+        }
+        updateSoundIcon(getSharedPreferences(SOUND_PREFS, MODE_PRIVATE)
+            .getBoolean(KEY_SOUND_ENABLED, true))
+        appBar.addView(soundToggle, LinearLayout.LayoutParams(dp(48), dp(48)))
+        appBar.addView(iconButton(R.drawable.ic_add, R.string.add_clip_content_description) {
+            openDocumentPicker()
+        }.apply { id = R.id.addClip }, LinearLayout.LayoutParams(dp(48), dp(48)))
+        val searchContainer = LinearLayout(this).apply {
+            id = R.id.searchContainer
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = getDrawable(R.drawable.rounded_search_container)
+        }
+        searchContainer.addView(ImageView(this).apply {
+            setImageResource(R.drawable.ic_search)
+            imageTintList = getColorStateList(R.color.text_secondary)
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        }, LinearLayout.LayoutParams(dp(24), dp(24)).apply {
+            marginStart = dp(16)
+            marginEnd = dp(8)
+        })
+        searchInput = EditText(this).apply {
+            id = R.id.searchInput
             hint = getString(R.string.search_hint)
             inputType = InputType.TYPE_CLASS_TEXT
             imeOptions = EditorInfo.IME_ACTION_SEARCH
             setSingleLine()
             textSize = 16f
-            setTextColor(Color.WHITE)
-            setHintTextColor(Color.rgb(150, 153, 162))
-            background = roundedBackground(Color.rgb(29, 31, 37))
-            setPadding(dp(16), 0, dp(16), 0)
+            setTextColor(getColor(R.color.text_primary))
+            setHintTextColor(getColor(R.color.text_secondary))
+            background = null
             addTextChangedListener(object : TextWatcher {
                 override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
                 override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
                     moves = filterMoves(allMoves, s.toString())
-                    adapter.notifyDataSetChanged()
+                    adapter.submitList(moves)
+                    updateEmptyState()
+                    clearSearch.visibility = if (s.isNullOrBlank()) View.GONE else View.VISIBLE
                 }
                 override fun afterTextChanged(s: Editable?) {}
             })
         }
-        val preferences = getSharedPreferences(SOUND_PREFS, MODE_PRIVATE)
-        val toggle = Switch(this).apply {
-            isChecked = preferences.getBoolean(KEY_SOUND_ENABLED, true)
-            setText(if (isChecked) R.string.sound_on else R.string.sound_off)
-            setOnCheckedChangeListener { _, enabled ->
-                preferences.edit().putBoolean(KEY_SOUND_ENABLED, enabled).apply()
-                setText(if (enabled) R.string.sound_on else R.string.sound_off)
-            }
-            textSize = 13f
-            minHeight = dp(48)
-            switchPadding = dp(8)
-            setTextColor(Color.rgb(190, 193, 202))
+        searchContainer.addView(searchInput, LinearLayout.LayoutParams(
+            0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        clearSearch = iconButton(R.drawable.ic_clear, R.string.clear_search) {
+            searchInput.setText("")
+        }.apply {
+            id = R.id.clearSearch
+            visibility = View.GONE
         }
-        val grid = GridView(this).apply {
-            numColumns = 3
-            horizontalSpacing = dp(12)
-            verticalSpacing = dp(12)
-            clipToPadding = false
-            setPadding(dp(16), dp(12), dp(16), dp(88))
-            selector = android.graphics.drawable.ColorDrawable(Color.TRANSPARENT)
-            stretchMode = GridView.STRETCH_COLUMN_WIDTH
-            adapter = this@MainActivity.adapter
-            setOnItemClickListener { _, _, position, _ ->
-                openMove(moves[position])
-            }
-            setOnItemLongClickListener { _, _, position, _ ->
-                val move = moves[position]
-                if (move.uri != null) showMoveOptions(move)
-                true
-            }
-        }
-        header.addView(Button(this).apply {
-            text = "Add clip"
-            setOnClickListener {
-                startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-                    type = "video/*"
-                    addCategory(Intent.CATEGORY_OPENABLE)
-                }, 100)
-            }
+        searchContainer.addView(clearSearch, LinearLayout.LayoutParams(dp(40), dp(40)))
+        headerSection.addView(appBar)
+        headerSection.addView(searchContainer, LinearLayout.LayoutParams(-1, dp(48)).apply {
+            topMargin = dp(12)
         })
-        header.addView(toggle, LinearLayout.LayoutParams(-2, -2))
-        headerSection.addView(header)
-        headerSection.addView(search, LinearLayout.LayoutParams(-1, dp(44)))
-        content.addView(headerSection, LinearLayout.LayoutParams(-1, -2))
+        content.addView(headerSection, LinearLayout.LayoutParams(-1, ViewGroup.LayoutParams.WRAP_CONTENT))
         content.addView(View(this).apply {
-            setBackgroundColor(Color.rgb(43, 45, 52))
-        }, LinearLayout.LayoutParams(-1, dp(1)))
+            setBackgroundColor(getColor(R.color.outline))
+        }, LinearLayout.LayoutParams(-1, 1))
         val gridContainer = FrameLayout(this).apply {
             clipChildren = true
-            addView(grid, FrameLayout.LayoutParams(-1, -1))
         }
+        recyclerView = RecyclerView(this).apply {
+            id = R.id.moveGrid
+            layoutManager = GridLayoutManager(this@MainActivity, 3)
+            adapter = this@MainActivity.adapter
+            setPadding(dp(10), dp(6), dp(10), dp(88))
+            clipToPadding = false
+        }
+        gridContainer.addView(recyclerView, FrameLayout.LayoutParams(-1, -1))
+        emptyState = LinearLayout(this).apply {
+            id = R.id.emptyState
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            visibility = View.GONE
+            addView(ImageView(this@MainActivity).apply {
+                setImageResource(R.drawable.ic_search)
+                imageTintList = getColorStateList(R.color.text_secondary)
+                alpha = 0.4f
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            }, LinearLayout.LayoutParams(dp(64), dp(64)))
+            addView(TextView(this@MainActivity).apply {
+                setText(R.string.no_moves_found)
+                textSize = 16f
+                gravity = Gravity.CENTER
+                setTextColor(getColor(R.color.text_secondary))
+            }, LinearLayout.LayoutParams(-2, -2).apply {
+                topMargin = dp(12)
+            })
+            addView(MaterialButton(this@MainActivity).apply {
+                id = R.id.clearSearchButton
+                setText(R.string.clear_search)
+                setOnClickListener { searchInput.setText("") }
+            }, LinearLayout.LayoutParams(-2, -2).apply {
+                topMargin = dp(16)
+            })
+        }
+        gridContainer.addView(emptyState, FrameLayout.LayoutParams(-1, -1, Gravity.CENTER))
         content.addView(gridContainer, LinearLayout.LayoutParams(-1, 0, 1f))
         root.addView(content, FrameLayout.LayoutParams(-1, -1))
-        val dice = ImageButton(this).apply {
-            setImageResource(R.drawable.ic_dice)
+        val dice = FloatingActionButton(this).apply {
+            id = R.id.dice
+            setImageDrawable(getDrawable(R.drawable.ic_dice))
+            imageTintList = getColorStateList(R.color.on_primary_container)
+            backgroundTintList = getColorStateList(R.color.primary_container)
             contentDescription = getString(R.string.play_random_move)
-            val circle = GradientDrawable().apply {
-                shape = GradientDrawable.OVAL
-                setColor(Color.rgb(166, 180, 214))
-            }
-            background = android.graphics.drawable.RippleDrawable(
-                android.content.res.ColorStateList.valueOf(0x33000000), circle, null)
-            setPadding(dp(16), dp(16), dp(16), dp(16))
-            elevation = dp(6).toFloat()
             setOnClickListener { allMoves.randomOrNull()?.let { openMove(it, loop = true) } }
         }
         root.addView(dice, FrameLayout.LayoutParams(dp(56), dp(56), Gravity.BOTTOM or Gravity.END).apply {
             setMargins(dp(16), dp(16), dp(16), dp(16))
         })
         setContentView(root)
-        search.setText(savedInstanceState?.getString("query").orEmpty())
-        searchInput = search
-        loadThumbnails()
+        searchInput.setText(savedInstanceState?.getString("query").orEmpty())
     }
 
     override fun onResume() {
@@ -155,8 +197,13 @@ class MainActivity : Activity() {
     private fun reloadMoves() {
         allMoves = discoverMoves(resources) + SavedMoves.load(this)
         moves = filterMoves(allMoves, searchInput.text.toString())
-        adapter.notifyDataSetChanged()
+        adapter.submitList(moves)
+        updateEmptyState()
         loadThumbnails()
+    }
+
+    private fun updateEmptyState() {
+        emptyState.visibility = if (moves.isEmpty()) View.VISIBLE else View.GONE
     }
 
     @Deprecated("Platform callback")
@@ -180,14 +227,33 @@ class MainActivity : Activity() {
             .putExtra(PlayerActivity.LOOP_EXTRA, loop))
     }
 
+    private fun openDocumentPicker() {
+        startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            type = "video/*"
+            addCategory(Intent.CATEGORY_OPENABLE)
+        }, 100)
+    }
+
+    private fun toggleSound() {
+        val preferences = getSharedPreferences(SOUND_PREFS, MODE_PRIVATE)
+        val enabled = !preferences.getBoolean(KEY_SOUND_ENABLED, true)
+        preferences.edit().putBoolean(KEY_SOUND_ENABLED, enabled).apply()
+        updateSoundIcon(enabled)
+    }
+
+    private fun updateSoundIcon(enabled: Boolean) {
+        soundToggle.setImageResource(if (enabled) R.drawable.ic_volume_up else R.drawable.ic_volume_off)
+        soundToggle.contentDescription = getString(if (enabled) R.string.sound_on else R.string.sound_off)
+    }
+
     private fun showMoveOptions(move: Move) {
         val uri = move.uri ?: return
         AlertDialog.Builder(this)
             .setTitle(move.name)
-            .setItems(arrayOf("Edit clip", "Delete")) { _, option ->
+            .setItems(arrayOf(getString(R.string.edit_clip), getString(R.string.delete_clip))) { _, option ->
                 when (option) {
                     0 -> startActivity(Intent(this, ImportActivity::class.java)
-                        .setData(android.net.Uri.parse(uri))
+                        .setData(Uri.parse(uri))
                         .putExtra(ImportActivity.NAME_EXTRA, move.name))
                     1 -> confirmDelete(move)
                 }
@@ -198,9 +264,9 @@ class MainActivity : Activity() {
     private fun confirmDelete(move: Move) {
         AlertDialog.Builder(this)
             .setTitle(move.name)
-            .setMessage("Delete this clip? The original video stays where it is.")
-            .setNegativeButton("Cancel", null)
-            .setPositiveButton("Delete") { _, _ -> deleteMove(move) }
+            .setMessage(R.string.delete_clip_message)
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.delete_clip) { _, _ -> deleteMove(move) }
             .show()
     }
 
@@ -215,22 +281,33 @@ class MainActivity : Activity() {
 
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 
-    private fun roundedBackground(color: Int) = GradientDrawable().apply {
-        setColor(color)
-        cornerRadius = dp(12).toFloat()
+    private fun borderlessRipple(): Drawable {
+        val value = TypedValue()
+        theme.resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, value, true)
+        return getDrawable(value.resourceId)!!
+    }
+
+    private fun iconButton(icon: Int, description: Int, onClick: () -> Unit) = ImageButton(this).apply {
+        setImageResource(icon)
+        imageTintList = getColorStateList(R.color.text_primary)
+        background = borderlessRipple()
+        scaleType = ImageView.ScaleType.CENTER_INSIDE
+        contentDescription = getString(description)
+        setOnClickListener { onClick() }
     }
 
     private fun loadThumbnails() {
         thumbnailWorker.execute {
             for (move in allMoves) {
                 if (Thread.currentThread().isInterrupted) break
+                if (thumbnails.containsKey(move)) continue
                 val retriever = MediaMetadataRetriever()
                 try {
-                    if (move.uri != null) retriever.setDataSource(this, android.net.Uri.parse(move.uri))
+                    if (move.uri != null) retriever.setDataSource(this, Uri.parse(move.uri))
                     else resources.openRawResourceFd(move.videoResId).use { descriptor ->
                         retriever.setDataSource(descriptor.fileDescriptor, descriptor.startOffset, descriptor.length)
                     }
-                    val frame = if (android.os.Build.VERSION.SDK_INT >= 27) {
+                    val frame = if (Build.VERSION.SDK_INT >= 27) {
                         retriever.getScaledFrameAtTime(500_000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC, 360, 640)
                     } else {
                         retriever.getFrameAtTime(500_000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
@@ -238,7 +315,8 @@ class MainActivity : Activity() {
                     if (frame != null) runOnUiThread {
                         if (!isDestroyed) {
                             thumbnails[move] = frame
-                            adapter.notifyDataSetChanged()
+                            val position = adapter.currentList.indexOf(move)
+                            if (position >= 0) adapter.notifyItemChanged(position)
                         }
                     }
                 } catch (exception: Exception) {
@@ -255,42 +333,36 @@ class MainActivity : Activity() {
         super.onDestroy()
     }
 
-    private inner class MoveAdapter : BaseAdapter() {
-        override fun getCount() = moves.size
-        override fun getItem(position: Int) = moves[position]
-        override fun getItemId(position: Int) = position.toLong()
-        override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-            val tile = convertView as? FrameLayout ?: object : FrameLayout(this@MainActivity) {
-                override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-                    val width = View.MeasureSpec.getSize(widthMeasureSpec)
-                    super.onMeasure(widthMeasureSpec, View.MeasureSpec.makeMeasureSpec(
-                        (width * 12f / 9f).toInt(), View.MeasureSpec.EXACTLY))
-                }
-            }.apply {
-                background = roundedBackground(Color.rgb(29, 31, 37))
-                clipToOutline = true
-                addView(ImageView(context).apply {
-                    scaleType = ImageView.ScaleType.CENTER_CROP
-                    setBackgroundColor(Color.rgb(37, 40, 48))
-                    importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-                }, FrameLayout.LayoutParams(-1, -1))
-                addView(TextView(context).apply {
-                    gravity = Gravity.CENTER_VERTICAL
-                    textSize = 16f
-                    setTextColor(Color.WHITE)
-                    setPadding(dp(10), dp(8), dp(10), dp(8))
-                    setBackgroundColor(Color.argb(210, 16, 17, 20))
-                }, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM))
+    private inner class MoveAdapter : ListAdapter<Move, MoveAdapter.MoveTileViewHolder>(MoveDiff) {
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MoveTileViewHolder {
+            val tile = MoveTileView(parent.context)
+            tile.layoutParams = RecyclerView.LayoutParams(-1, -2).apply {
+                setMargins(dp(6), dp(6), dp(6), dp(6))
             }
-            val move = getItem(position)
-            (tile.getChildAt(0) as ImageView).setImageBitmap(thumbnails[move])
-            (tile.getChildAt(1) as TextView).text = move.name
-            return tile
+            return MoveTileViewHolder(tile)
         }
+
+        override fun onBindViewHolder(holder: MoveTileViewHolder, position: Int) {
+            val move = getItem(position)
+            holder.tile.bind(thumbnails[move], move.name, move.uri != null)
+            holder.tile.setOnClickListener { openMove(move) }
+            holder.tile.setOnLongClickListener {
+                showMoveOptions(move)
+                true
+            }
+        }
+
+        inner class MoveTileViewHolder(val tile: MoveTileView) : RecyclerView.ViewHolder(tile)
     }
 
     companion object {
         const val SOUND_PREFS = "soundboard"
         const val KEY_SOUND_ENABLED = "sound_enabled"
+
+        private val MoveDiff = object : DiffUtil.ItemCallback<Move>() {
+            override fun areItemsTheSame(oldItem: Move, newItem: Move) =
+                oldItem.videoResId == newItem.videoResId && oldItem.uri == newItem.uri
+            override fun areContentsTheSame(oldItem: Move, newItem: Move) = oldItem == newItem
+        }
     }
 }

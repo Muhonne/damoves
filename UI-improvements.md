@@ -30,15 +30,19 @@ dependencies {
     // Unit Testing
     testImplementation "junit:junit:4.13.2"
     testImplementation "org.robolectric:robolectric:4.14.1"
+    testImplementation "androidx.test.ext:junit:1.2.1"
+    testImplementation "androidx.test:core:1.6.1"
 
     // Automated UI & User Flow Testing (Espresso / AndroidX Test)
     androidTestImplementation "androidx.test.ext:junit:1.2.1"
-    androidTestImplementation "androidx.test:runner:1.6.2"
+    androidTestImplementation "androidx.test:runner:1.7.0"
     androidTestImplementation "androidx.test:rules:1.6.1"
-    androidTestImplementation "androidx.test.espresso:espresso-core:3.6.1"
-    androidTestImplementation "androidx.test.espresso:espresso-contrib:3.6.1"
+    androidTestImplementation "androidx.test.espresso:espresso-core:3.7.0"
+    androidTestImplementation "androidx.test.espresso:espresso-contrib:3.7.0"
 }
 ```
+
+*Espresso version note:* Espresso 3.6.1 (and earlier) reflects `android.hardware.input.InputManager.getInstance()`, which no longer exists on API 37 system images — every `onView()` call throws `NoSuchMethodException` there. Espresso 3.7.0 uses `Context.getSystemService(InputManager.class)` on API 23+ and is the minimum for testing on API 37 devices.
 
 *Note on Material 3:* Google provides M3 via two paths:
 1. **Material Components for Android** (`com.google.android.material:material`) for XML/View-based apps like Damoves. This provides native M3 widgets (`MaterialCardView`, `SearchBar`, `MaterialButton`, `MaterialAlertDialogBuilder`, `BottomSheetDialog`) that drop directly into our existing View hierarchy without full rewrite.
