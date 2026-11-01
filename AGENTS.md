@@ -15,8 +15,13 @@ Help dancers check dance-move videos quickly between songs. Prioritize finding a
 - Copy videos to `app/src/main/res/raw/`; discover moves automatically from bundled video filenames, with no manual registry. Card thumbnails come directly from video frames.
 - Derive move labels from resource entry names, never packaged file basenames: release packaging shortens resource paths. Verify readable move labels in the signed release.
 - Keep the UI minimal and dark. Refer to dance clips as moves; sound refers only to audio settings.
-- Update the README when setup or behavior changes.
-- See `docs/android-tooling.md` for Android Studio, JDK 25, SDK, emulator, and signed device installation workflows.
+- Update the [README](README.md) for setup changes and [User flows](docs/userflows.md) for behavior changes.
+
+## Documentation
+
+- [README](README.md): what Damoves is, use, adding moves, build, signed release, tests, device checks.
+- [User flows](docs/userflows.md): how each screen behaves, screen by screen, and what happens at the edges.
+- [Android tooling](docs/android-tooling.md): Android Studio, JDK 25, SDK, emulator, and signed device installation workflows.
 
 ## Validation
 

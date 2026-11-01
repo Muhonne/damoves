@@ -17,6 +17,8 @@ class ImportActivity : Activity() {
     private var previewing = false
     private lateinit var timeline: ClipTimeline
     private lateinit var rangeLabel: android.widget.TextView
+    private lateinit var previewButton: android.widget.Button
+    private var repeatRunnable: Runnable? = null
     private val handler = android.os.Handler(android.os.Looper.getMainLooper())
     private val checkRange = object : Runnable {
         override fun run() {
@@ -24,6 +26,7 @@ class ImportActivity : Activity() {
                 previewing = false
                 videoView.pause()
                 videoView.seekTo(timeline.start)
+                updatePreviewButton()
             }
             handler.postDelayed(this, 20)
         }
@@ -36,6 +39,68 @@ class ImportActivity : Activity() {
         rangeLabel.text = java.lang.String.format(java.util.Locale.US,
             "Start %.2f s  —  End %.2f s", timeline.start / 1000.0, timeline.end / 1000.0)
         timeline.invalidate()
+        updatePreviewButton()
+    }
+
+    private fun updatePreviewButton() {
+        if (!::previewButton.isInitialized) return
+        previewButton.text = if (previewing) "Pause preview" else "Preview selection"
+    }
+
+    private fun seekBy(deltaMs: Int) {
+        val duration = videoView.duration
+        if (duration <= 0) return
+        videoView.seekTo((videoView.currentPosition + deltaMs).coerceIn(0, duration))
+    }
+
+    private fun nudge(startChanged: Boolean, deltaMs: Int) {
+        if (startChanged) timeline.start = (timeline.start + deltaMs).coerceIn(0, timeline.end - 1)
+        else timeline.end = (timeline.end + deltaMs).coerceIn(timeline.start + 1, timeline.duration)
+        updateRange(startChanged)
+    }
+
+    private fun stopRepeat() {
+        repeatRunnable?.let { handler.removeCallbacks(it) }
+        repeatRunnable = null
+    }
+
+    private fun addNudgeButton(
+        parent: android.widget.LinearLayout,
+        label: String,
+        startChanged: Boolean,
+        deltaMs: Int,
+    ) {
+        val button = android.widget.Button(this).apply {
+            text = label
+            contentDescription = "$label 0.5 seconds, hold to repeat"
+        }
+        button.setOnTouchListener { view, event ->
+            when (event.actionMasked) {
+                android.view.MotionEvent.ACTION_DOWN -> {
+                    stopRepeat()
+                    nudge(startChanged, deltaMs)
+                    val runnable = object : Runnable {
+                        override fun run() {
+                            if (!button.isPressed) {
+                                stopRepeat()
+                                return
+                            }
+                            nudge(startChanged, deltaMs)
+                            handler.postDelayed(this, REPEAT_INTERVAL_MS)
+                        }
+                    }
+                    repeatRunnable = runnable
+                    handler.postDelayed(runnable, REPEAT_DELAY_MS)
+                }
+                android.view.MotionEvent.ACTION_UP -> {
+                    stopRepeat()
+                    view.performClick()
+                }
+                android.view.MotionEvent.ACTION_CANCEL -> stopRepeat()
+            }
+            false
+        }
+        parent.addView(button, android.widget.LinearLayout.LayoutParams(0, -2, 1f))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -108,27 +173,38 @@ class ImportActivity : Activity() {
         editor.addView(rangeLabel)
         editor.addView(timeline, android.widget.LinearLayout.LayoutParams(-1, (64 * resources.displayMetrics.density).toInt()))
         val fine = android.widget.LinearLayout(this)
-        listOf("Start −" to Pair(true, -500), "Start +" to Pair(true, 500),
-            "End −" to Pair(false, -500), "End +" to Pair(false, 500)).forEach { (label, change) ->
-            fine.addView(android.widget.Button(this).apply {
-                text = label
-                contentDescription = "$label 0.5 seconds"
-                setOnClickListener {
-                    if (change.first) timeline.start = (timeline.start + change.second).coerceIn(0, timeline.end - 1)
-                    else timeline.end = (timeline.end + change.second).coerceIn(timeline.start + 1, timeline.duration)
-                    updateRange(change.first)
-                }
-            }, android.widget.LinearLayout.LayoutParams(0, -2, 1f))
-        }
+        addNudgeButton(fine, "Start −", true, -500)
+        addNudgeButton(fine, "Start +", true, 500)
+        addNudgeButton(fine, "End −", false, -500)
+        addNudgeButton(fine, "End +", false, 500)
         editor.addView(fine)
-        editor.addView(android.widget.Button(this).apply {
+        val previewRow = android.widget.LinearLayout(this)
+        previewRow.addView(android.widget.Button(this).apply {
+            text = "−5s"
+            contentDescription = "Rewind 5 seconds"
+            setOnClickListener { seekBy(-5000) }
+        }, android.widget.LinearLayout.LayoutParams(0, -2, 1f))
+        previewButton = android.widget.Button(this).apply {
             text = "Preview selection"
             setOnClickListener {
-                videoView.seekTo(timeline.start)
-                previewing = true
-                videoView.start()
+                if (previewing) {
+                    previewing = false
+                    videoView.pause()
+                } else {
+                    videoView.seekTo(timeline.start)
+                    previewing = true
+                    videoView.start()
+                }
+                updatePreviewButton()
             }
-        })
+        }
+        previewRow.addView(previewButton, android.widget.LinearLayout.LayoutParams(0, -2, 2f))
+        previewRow.addView(android.widget.Button(this).apply {
+            text = "+5s"
+            contentDescription = "Forward 5 seconds"
+            setOnClickListener { seekBy(5000) }
+        }, android.widget.LinearLayout.LayoutParams(0, -2, 1f))
+        editor.addView(previewRow)
         controls.addView(editor)
         val nameInput = android.widget.EditText(this).apply {
             hint = "Move name"
@@ -151,6 +227,7 @@ class ImportActivity : Activity() {
                 if (videoView.duration <= 0) return@setOnClickListener
                 videoView.pause()
                 previewing = false
+                updatePreviewButton()
                 isEnabled = false
                 text = "Saving…"
                 val start = timeline.start
@@ -194,5 +271,7 @@ class ImportActivity : Activity() {
     companion object {
         const val VIDEO_EXTRA = "video"
         const val LOOP_EXTRA = "loop"
+        private const val REPEAT_DELAY_MS = 400L
+        private const val REPEAT_INTERVAL_MS = 120L
     }
 }

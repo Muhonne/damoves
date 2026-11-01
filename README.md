@@ -15,6 +15,8 @@ The launcher icon pairs the dancing woman and man emoji (💃🕺) from Google N
 - Tap **Add clip**, select a video with the system gallery/document picker, and choose a range on the two-handle timeline. Fine-tune start/end in 0.5-second steps, preview, enter a move name, and tap **Save move**. A trimmed MP4 is saved privately in the app and appears in the grid, search, and dice selections, available offline. The original is untouched. Uninstalling the app removes imported moves.
 - Trimming uses fast lossless stream copying: the saved start snaps to the preceding video keyframe, so it can include a little extra footage before your selection. Export support depends on the source codecs; MP4 with H.264/AAC is recommended. No broad gallery permission is required.
 
+See [User flows](docs/userflows.md) for the screen-by-screen behavior, including the clip importer.
+
 ## Add dance moves
 
 1. Copy each dance-move video into **`app/src/main/res/raw/`**. Use MP4 with H.264 video and AAC audio for broad device compatibility. Use lowercase letters, digits, and underscores in filenames, for example `cross_body_lead.mp4`.
