@@ -1,7 +1,6 @@
 package com.example.soundboard
 
 import android.app.Activity
-import android.app.AlertDialog
 import android.content.Intent
 import android.content.res.ColorStateList
 import android.graphics.Bitmap
@@ -17,6 +16,7 @@ import android.text.TextWatcher
 import android.util.Log
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.HapticFeedbackConstants
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
@@ -25,7 +25,9 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import java.util.concurrent.Executors
 
@@ -248,22 +250,58 @@ class MainActivity : Activity() {
 
     private fun showMoveOptions(move: Move) {
         val uri = move.uri ?: return
-        AlertDialog.Builder(this)
-            .setTitle(move.name)
-            .setItems(arrayOf(getString(R.string.edit_clip), getString(R.string.delete_clip))) { _, option ->
-                when (option) {
-                    0 -> startActivity(Intent(this, ImportActivity::class.java)
-                        .setData(Uri.parse(uri))
-                        .putExtra(ImportActivity.NAME_EXTRA, move.name))
-                    1 -> confirmDelete(move)
-                }
-            }
-            .show()
+        val sheet = BottomSheetDialog(this)
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(8), dp(16), dp(24))
+        }
+        content.addView(TextView(this).apply {
+            setText(move.name)
+            textSize = 18f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(getColor(R.color.text_primary))
+            setPadding(dp(8), dp(16), dp(8), dp(8))
+        })
+        content.addView(sheetRow(R.drawable.ic_edit, R.string.edit_clip, R.color.text_primary) {
+            sheet.dismiss()
+            startActivity(Intent(this, ImportActivity::class.java)
+                .setData(Uri.parse(uri))
+                .putExtra(ImportActivity.NAME_EXTRA, move.name))
+        })
+        content.addView(sheetRow(R.drawable.ic_delete, R.string.delete_from_damoves, R.color.danger) {
+            sheet.dismiss()
+            confirmDelete(move)
+        })
+        sheet.setContentView(content)
+        sheet.show()
     }
 
+    private fun sheetRow(icon: Int, label: Int, tint: Int, onClick: () -> Unit) =
+        LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            minimumHeight = dp(56)
+            setPadding(dp(8), 0, dp(8), 0)
+            background = boundedRipple()
+            isClickable = true
+            addView(ImageView(this@MainActivity).apply {
+                setImageResource(icon)
+                imageTintList = getColorStateList(tint)
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            }, LinearLayout.LayoutParams(dp(24), dp(24)).apply {
+                marginEnd = dp(16)
+            })
+            addView(TextView(this@MainActivity).apply {
+                setText(label)
+                textSize = 16f
+                setTextColor(getColor(tint))
+            }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            setOnClickListener { onClick() }
+        }
+
     private fun confirmDelete(move: Move) {
-        AlertDialog.Builder(this)
-            .setTitle(move.name)
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.delete_clip_title)
             .setMessage(R.string.delete_clip_message)
             .setNegativeButton(R.string.cancel, null)
             .setPositiveButton(R.string.delete_clip) { _, _ -> deleteMove(move) }
@@ -273,6 +311,9 @@ class MainActivity : Activity() {
     private fun deleteMove(move: Move) {
         val uri = move.uri ?: return
         val deleted = SavedMoves.delete(this, uri)
+        window.decorView.performHapticFeedback(
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) HapticFeedbackConstants.CONFIRM
+            else HapticFeedbackConstants.LONG_PRESS)
         Toast.makeText(this,
             if (deleted) "Clip deleted" else "Could not delete this clip",
             Toast.LENGTH_SHORT).show()
@@ -284,6 +325,12 @@ class MainActivity : Activity() {
     private fun borderlessRipple(): Drawable {
         val value = TypedValue()
         theme.resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, value, true)
+        return getDrawable(value.resourceId)!!
+    }
+
+    private fun boundedRipple(): Drawable {
+        val value = TypedValue()
+        theme.resolveAttribute(android.R.attr.selectableItemBackground, value, true)
         return getDrawable(value.resourceId)!!
     }
 
