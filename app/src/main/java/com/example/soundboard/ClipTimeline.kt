@@ -2,8 +2,8 @@ package com.example.soundboard
 
 import android.content.Context
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Paint
+import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
 import kotlin.math.abs
@@ -16,21 +16,26 @@ class ClipTimeline(context: Context) : View(context) {
     var onChange: ((Boolean) -> Unit)? = null
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private var draggingStart = true
+    private var lastHapticValue = -1
     private val padding = 24f * resources.displayMetrics.density
 
     override fun onDraw(canvas: Canvas) {
+        val density = resources.displayMetrics.density
         val left = padding
         val span = (width - padding * 2).coerceAtLeast(1f)
         val y = height / 2f
-        paint.strokeWidth = 8f * resources.displayMetrics.density
-        paint.color = Color.DKGRAY
-        canvas.drawLine(left, y, left + span, y, paint)
         val a = left + span * start / duration
         val b = left + span * end / duration
-        paint.color = Color.CYAN
+        paint.style = Paint.Style.STROKE
+        paint.strokeCap = Paint.Cap.ROUND
+        paint.strokeWidth = 10f * density
+        paint.color = context.getColor(R.color.outline)
+        canvas.drawLine(left, y, left + span, y, paint)
+        paint.color = context.getColor(R.color.primary)
         canvas.drawLine(a, y, b, y, paint)
-        canvas.drawCircle(a, y, 10f * resources.displayMetrics.density, paint)
-        canvas.drawCircle(b, y, 10f * resources.displayMetrics.density, paint)
+        paint.style = Paint.Style.FILL
+        canvas.drawCircle(a, y, 12f * density, paint)
+        canvas.drawCircle(b, y, 12f * density, paint)
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
@@ -48,6 +53,10 @@ class ClipTimeline(context: Context) : View(context) {
         }
         if (draggingStart) start = value.coerceAtMost(end - 1).coerceAtLeast(0)
         else end = value.coerceAtLeast(start + 1).coerceAtMost(duration)
+        if (abs(value - lastHapticValue) >= 250) {
+            lastHapticValue = value
+            performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+        }
         invalidate()
         onChange?.invoke(draggingStart)
         return true

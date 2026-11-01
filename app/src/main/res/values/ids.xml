@@ -9,4 +9,14 @@
     <item name="emptyState" type="id" />
     <item name="clearSearchButton" type="id" />
     <item name="dice" type="id" />
+    <item name="importRangeLabel" type="id" />
+    <item name="importNameInput" type="id" />
+    <item name="importPreviewButton" type="id" />
+    <item name="importRewind" type="id" />
+    <item name="importForward" type="id" />
+    <item name="importNudgeStartMinus" type="id" />
+    <item name="importNudgeStartPlus" type="id" />
+    <item name="importNudgeEndMinus" type="id" />
+    <item name="importNudgeEndPlus" type="id" />
+    <item name="importSaveButton" type="id" />
 </resources>

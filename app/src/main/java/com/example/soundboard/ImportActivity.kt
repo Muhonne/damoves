@@ -1,14 +1,20 @@
 package com.example.soundboard
 
 import android.app.Activity
+import android.content.res.ColorStateList
 import android.graphics.Color
-import android.net.Uri
 import android.os.Bundle
+import android.view.Gravity
+import android.view.HapticFeedbackConstants
+import android.view.View
+import android.widget.EditText
 import android.widget.FrameLayout
+import android.widget.LinearLayout
+import android.widget.ScrollView
+import android.widget.TextView
 import android.widget.Toast
 import android.widget.VideoView
-import android.view.Gravity
-import android.view.View
+import com.google.android.material.button.MaterialButton
 
 class ImportActivity : Activity() {
     private lateinit var videoView: VideoView
@@ -16,8 +22,8 @@ class ImportActivity : Activity() {
     private var editing = false
     private var previewing = false
     private lateinit var timeline: ClipTimeline
-    private lateinit var rangeLabel: android.widget.TextView
-    private lateinit var previewButton: android.widget.Button
+    private lateinit var rangeLabel: TextView
+    private lateinit var previewButton: MaterialButton
     private var repeatRunnable: Runnable? = null
     private val handler = android.os.Handler(android.os.Looper.getMainLooper())
     private val checkRange = object : Runnable {
@@ -51,11 +57,13 @@ class ImportActivity : Activity() {
         val duration = videoView.duration
         if (duration <= 0) return
         videoView.seekTo((videoView.currentPosition + deltaMs).coerceIn(0, duration))
+        window.decorView.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
     }
 
     private fun nudge(startChanged: Boolean, deltaMs: Int) {
         if (startChanged) timeline.start = (timeline.start + deltaMs).coerceIn(0, timeline.end - 1)
         else timeline.end = (timeline.end + deltaMs).coerceIn(timeline.start + 1, timeline.duration)
+        window.decorView.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
         updateRange(startChanged)
     }
 
@@ -65,15 +73,14 @@ class ImportActivity : Activity() {
     }
 
     private fun addNudgeButton(
-        parent: android.widget.LinearLayout,
+        parent: LinearLayout,
+        id: Int,
         label: String,
         startChanged: Boolean,
         deltaMs: Int,
     ) {
-        val button = android.widget.Button(this).apply {
-            text = label
-            contentDescription = "$label 0.5 seconds, hold to repeat"
-        }
+        val button = tonalButton(label, id)
+        button.contentDescription = "$label 0.5 seconds, hold to repeat"
         button.setOnTouchListener { view, event ->
             when (event.actionMasked) {
                 android.view.MotionEvent.ACTION_DOWN -> {
@@ -100,7 +107,33 @@ class ImportActivity : Activity() {
             }
             false
         }
-        parent.addView(button, android.widget.LinearLayout.LayoutParams(0, -2, 1f))
+        parent.addView(button, LinearLayout.LayoutParams(0, -2, 1f))
+    }
+
+    private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
+
+    private fun tonalButton(label: String, id: Int) = MaterialButton(this).apply {
+        this.id = id
+        text = label
+        backgroundTintList = getColorStateList(R.color.primary_container)
+        setTextColor(getColor(R.color.on_primary_container))
+    }
+
+    private fun outlinedButton(label: String, id: Int, onClick: () -> Unit) = MaterialButton(this).apply {
+        this.id = id
+        text = label
+        backgroundTintList = ColorStateList.valueOf(Color.TRANSPARENT)
+        strokeWidth = dp(1)
+        strokeColor = getColorStateList(R.color.outline)
+        setTextColor(getColor(R.color.text_primary))
+        setOnClickListener { onClick() }
+    }
+
+    private fun filledButton(label: String, id: Int) = MaterialButton(this).apply {
+        this.id = id
+        text = label
+        backgroundTintList = getColorStateList(R.color.primary)
+        setTextColor(getColor(R.color.on_primary))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -111,9 +144,9 @@ class ImportActivity : Activity() {
             finish()
             return
         }
-        val root = android.widget.LinearLayout(this).apply {
-            orientation = android.widget.LinearLayout.VERTICAL
-            setBackgroundColor(Color.BLACK)
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(getColor(R.color.surface))
             applySystemInsets()
         }
         videoView = VideoView(this).apply {
@@ -146,7 +179,7 @@ class ImportActivity : Activity() {
         }
         val videoContainer = FrameLayout(this)
         videoContainer.addView(videoView, FrameLayout.LayoutParams(-1, -1, Gravity.CENTER))
-        root.addView(videoContainer, android.widget.LinearLayout.LayoutParams(-1, 0, 1f))
+        root.addView(videoContainer, LinearLayout.LayoutParams(-1, 0, 1f))
         val closePlayer = View.OnClickListener {
             videoView.stopPlayback()
             finish()
@@ -154,38 +187,39 @@ class ImportActivity : Activity() {
         videoView.setOnClickListener(closePlayer)
         videoView.contentDescription = getString(R.string.close_video)
         root.setOnClickListener(closePlayer)
-        val controls = android.widget.LinearLayout(this).apply {
-            orientation = android.widget.LinearLayout.VERTICAL
-            setBackgroundColor(0xDD000000.toInt())
+        val controls = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(getColor(R.color.surface_container))
+            setPadding(dp(16), dp(16), dp(16), dp(16))
         }
-        val editor = android.widget.LinearLayout(this).apply {
-            orientation = android.widget.LinearLayout.VERTICAL
-            visibility = View.VISIBLE
-        }
-        rangeLabel = android.widget.TextView(this).apply {
-            setTextColor(Color.WHITE)
+        rangeLabel = TextView(this).apply {
+            id = R.id.importRangeLabel
+            setTextColor(getColor(R.color.text_primary))
+            textSize = 15f
             gravity = Gravity.CENTER
+            background = getDrawable(R.drawable.rounded_search_container)
+            setPadding(dp(12), dp(8), dp(12), dp(8))
         }
         timeline = ClipTimeline(this).apply {
             contentDescription = "Clip start and end; use the buttons below for fine adjustment"
             onChange = { updateRange(it) }
         }
-        editor.addView(rangeLabel)
-        editor.addView(timeline, android.widget.LinearLayout.LayoutParams(-1, (64 * resources.displayMetrics.density).toInt()))
-        val fine = android.widget.LinearLayout(this)
-        addNudgeButton(fine, "Start −", true, -500)
-        addNudgeButton(fine, "Start +", true, 500)
-        addNudgeButton(fine, "End −", false, -500)
-        addNudgeButton(fine, "End +", false, 500)
-        editor.addView(fine)
-        val previewRow = android.widget.LinearLayout(this)
-        previewRow.addView(android.widget.Button(this).apply {
-            text = "−5s"
-            contentDescription = "Rewind 5 seconds"
-            setOnClickListener { seekBy(-5000) }
-        }, android.widget.LinearLayout.LayoutParams(0, -2, 1f))
-        previewButton = android.widget.Button(this).apply {
-            text = "Preview selection"
+        controls.addView(rangeLabel)
+        controls.addView(timeline, LinearLayout.LayoutParams(-1, dp(72)).apply {
+            topMargin = dp(8)
+        })
+        val fine = LinearLayout(this)
+        addNudgeButton(fine, R.id.importNudgeStartMinus, "Start −", true, -500)
+        addNudgeButton(fine, R.id.importNudgeStartPlus, "Start +", true, 500)
+        addNudgeButton(fine, R.id.importNudgeEndMinus, "End −", false, -500)
+        addNudgeButton(fine, R.id.importNudgeEndPlus, "End +", false, 500)
+        controls.addView(fine, LinearLayout.LayoutParams(-1, -2).apply {
+            topMargin = dp(12)
+        })
+        val previewRow = LinearLayout(this)
+        previewRow.addView(outlinedButton("−5s", R.id.importRewind) { seekBy(-5000) },
+            LinearLayout.LayoutParams(0, -2, 1f))
+        previewButton = filledButton("Preview selection", R.id.importPreviewButton).apply {
             setOnClickListener {
                 if (previewing) {
                     previewing = false
@@ -198,57 +232,69 @@ class ImportActivity : Activity() {
                 updatePreviewButton()
             }
         }
-        previewRow.addView(previewButton, android.widget.LinearLayout.LayoutParams(0, -2, 2f))
-        previewRow.addView(android.widget.Button(this).apply {
-            text = "+5s"
-            contentDescription = "Forward 5 seconds"
-            setOnClickListener { seekBy(5000) }
-        }, android.widget.LinearLayout.LayoutParams(0, -2, 1f))
-        editor.addView(previewRow)
-        controls.addView(editor)
-        val nameInput = android.widget.EditText(this).apply {
+        previewRow.addView(previewButton, LinearLayout.LayoutParams(0, -2, 2f).apply {
+            marginStart = dp(8)
+            marginEnd = dp(8)
+        })
+        previewRow.addView(outlinedButton("+5s", R.id.importForward) { seekBy(5000) },
+            LinearLayout.LayoutParams(0, -2, 1f))
+        controls.addView(previewRow, LinearLayout.LayoutParams(-1, -2).apply {
+            topMargin = dp(8)
+        })
+        controls.addView(EditText(this).apply {
+            id = R.id.importNameInput
             hint = "Move name"
             setText(savedInstanceState?.getString("name") ?: intent.getStringExtra(NAME_EXTRA).orEmpty())
             tag = "moveName"
-            setTextColor(Color.WHITE)
-            setHintTextColor(Color.LTGRAY)
+            setTextColor(getColor(R.color.text_primary))
+            setHintTextColor(getColor(R.color.text_secondary))
             setSingleLine()
-        }
-        controls.addView(nameInput)
-        controls.addView(android.widget.TextView(this).apply {
-            text = "Fast trim: saved start snaps to the preceding video keyframe."
-            setTextColor(Color.LTGRAY)
+            background = getDrawable(R.drawable.rounded_search_container)
+            setPadding(dp(16), dp(12), dp(16), dp(12))
+        }, LinearLayout.LayoutParams(-1, -2).apply {
+            topMargin = dp(12)
         })
-        controls.addView(android.widget.Button(this).apply {
-            text = "Save move"
-            setOnClickListener {
-                val name = nameInput.text.toString().trim()
-                if (name.isEmpty()) { nameInput.error = "Enter a move name"; return@setOnClickListener }
-                if (videoView.duration <= 0) return@setOnClickListener
-                videoView.pause()
-                previewing = false
-                updatePreviewButton()
-                isEnabled = false
-                text = "Saving…"
-                val start = timeline.start
-                val end = timeline.end
-                Thread {
-                    val result = runCatching { SavedMoves.save(applicationContext, source, name, start, end) }
-                    runOnUiThread {
-                        if (!isDestroyed) {
-                            if (result.isSuccess) finish() else {
-                                isEnabled = true
-                                text = "Save move"
-                                Toast.makeText(this@ImportActivity, "Could not save this video. Try an MP4 video.", Toast.LENGTH_LONG).show()
-                            }
+        controls.addView(TextView(this).apply {
+            text = "Fast trim: saved start snaps to the preceding video keyframe."
+            setTextColor(getColor(R.color.text_secondary))
+            textSize = 12f
+        }, LinearLayout.LayoutParams(-1, -2).apply {
+            topMargin = dp(8)
+        })
+        val saveButton = filledButton("Save move", R.id.importSaveButton)
+        saveButton.setOnClickListener {
+            val name = window.decorView.findViewWithTag<EditText>("moveName")?.text?.toString()?.trim().orEmpty()
+            if (name.isEmpty()) {
+                window.decorView.findViewWithTag<EditText>("moveName")?.error = "Enter a move name"
+                return@setOnClickListener
+            }
+            if (videoView.duration <= 0) return@setOnClickListener
+            videoView.pause()
+            previewing = false
+            updatePreviewButton()
+            saveButton.isEnabled = false
+            saveButton.text = "Saving…"
+            val start = timeline.start
+            val end = timeline.end
+            Thread {
+                val result = runCatching { SavedMoves.save(applicationContext, source, name, start, end) }
+                runOnUiThread {
+                    if (!isDestroyed) {
+                        if (result.isSuccess) finish() else {
+                            saveButton.isEnabled = true
+                            saveButton.text = "Save move"
+                            Toast.makeText(this@ImportActivity, "Could not save this video. Try an MP4 video.", Toast.LENGTH_LONG).show()
                         }
                     }
-                }.start()
-            }
-        })
-        val scroll = android.widget.ScrollView(this)
+                }
+            }.start()
+        }
+        val scroll = ScrollView(this)
         scroll.addView(controls)
-        root.addView(scroll, android.widget.LinearLayout.LayoutParams(-1, (300 * resources.displayMetrics.density).toInt()))
+        root.addView(scroll, LinearLayout.LayoutParams(-1, dp(320)))
+        root.addView(saveButton, LinearLayout.LayoutParams(-1, -2).apply {
+            setMargins(dp(16), dp(8), dp(16), dp(16))
+        })
         setContentView(root)
         handler.post(checkRange)
         videoView.setVideoURI(source)
@@ -257,7 +303,7 @@ class ImportActivity : Activity() {
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putInt("start", timeline.start)
         outState.putInt("end", timeline.end)
-        outState.putString("name", window.decorView.findViewWithTag<android.widget.EditText>("moveName")?.text?.toString())
+        outState.putString("name", window.decorView.findViewWithTag<EditText>("moveName")?.text?.toString())
         super.onSaveInstanceState(outState)
     }
 
