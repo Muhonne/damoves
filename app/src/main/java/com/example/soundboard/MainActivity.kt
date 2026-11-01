@@ -23,12 +23,12 @@ class MainActivity : Activity() {
     private var moves = emptyList<Move>()
     private val adapter = MoveAdapter()
     private lateinit var searchInput: EditText
-    private val thumbnails = mutableMapOf<Int, Bitmap>()
+    private val thumbnails = mutableMapOf<Move, Bitmap>()
     private val thumbnailWorker = Executors.newSingleThreadExecutor()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        allMoves = discoverMoves(resources)
+        allMoves = discoverMoves(resources) + SavedMoves.load(this)
         moves = allMoves
         val root = FrameLayout(this).apply {
             setBackgroundColor(Color.rgb(16, 17, 20))
@@ -97,6 +97,15 @@ class MainActivity : Activity() {
                 openMove(moves[position])
             }
         }
+        header.addView(Button(this).apply {
+            text = "Add clip"
+            setOnClickListener {
+                startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                    type = "video/*"
+                    addCategory(Intent.CATEGORY_OPENABLE)
+                }, 100)
+            }
+        })
         header.addView(toggle, LinearLayout.LayoutParams(-2, -2))
         headerSection.addView(header)
         headerSection.addView(search, LinearLayout.LayoutParams(-1, dp(44)))
@@ -121,8 +130,7 @@ class MainActivity : Activity() {
                 android.content.res.ColorStateList.valueOf(0x33000000), circle, null)
             setPadding(dp(16), dp(16), dp(16), dp(16))
             elevation = dp(6).toFloat()
-            isEnabled = allMoves.isNotEmpty()
-            setOnClickListener { openMove(allMoves.random(), loop = true) }
+            setOnClickListener { allMoves.randomOrNull()?.let { openMove(it, loop = true) } }
         }
         root.addView(dice, FrameLayout.LayoutParams(dp(56), dp(56), Gravity.BOTTOM or Gravity.END).apply {
             setMargins(dp(16), dp(16), dp(16), dp(16))
@@ -133,6 +141,25 @@ class MainActivity : Activity() {
         loadThumbnails()
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (::searchInput.isInitialized) {
+            allMoves = discoverMoves(resources) + SavedMoves.load(this)
+            moves = filterMoves(allMoves, searchInput.text.toString())
+            adapter.notifyDataSetChanged()
+            loadThumbnails()
+        }
+    }
+
+    @Deprecated("Platform callback")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == 100 && resultCode == RESULT_OK && data?.data != null) {
+            startActivity(Intent(this, ImportActivity::class.java).setData(data.data)
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
+        }
+    }
+
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putString("query", searchInput.text.toString())
         super.onSaveInstanceState(outState)
@@ -140,6 +167,7 @@ class MainActivity : Activity() {
 
     private fun openMove(move: Move, loop: Boolean = false) {
         startActivity(Intent(this, PlayerActivity::class.java)
+            .putExtra("uri", move.uri)
             .putExtra(PlayerActivity.VIDEO_EXTRA, move.videoResId)
             .putExtra(PlayerActivity.LOOP_EXTRA, loop))
     }
@@ -157,7 +185,8 @@ class MainActivity : Activity() {
                 if (Thread.currentThread().isInterrupted) break
                 val retriever = MediaMetadataRetriever()
                 try {
-                    resources.openRawResourceFd(move.videoResId).use { descriptor ->
+                    if (move.uri != null) retriever.setDataSource(this, android.net.Uri.parse(move.uri))
+                    else resources.openRawResourceFd(move.videoResId).use { descriptor ->
                         retriever.setDataSource(descriptor.fileDescriptor, descriptor.startOffset, descriptor.length)
                     }
                     val frame = if (android.os.Build.VERSION.SDK_INT >= 27) {
@@ -167,7 +196,7 @@ class MainActivity : Activity() {
                     }
                     if (frame != null) runOnUiThread {
                         if (!isDestroyed) {
-                            thumbnails[move.videoResId] = frame
+                            thumbnails[move] = frame
                             adapter.notifyDataSetChanged()
                         }
                     }
@@ -213,7 +242,7 @@ class MainActivity : Activity() {
                 }, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM))
             }
             val move = getItem(position)
-            (tile.getChildAt(0) as ImageView).setImageBitmap(thumbnails[move.videoResId])
+            (tile.getChildAt(0) as ImageView).setImageBitmap(thumbnails[move])
             (tile.getChildAt(1) as TextView).text = move.name
             return tile
         }

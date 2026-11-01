@@ -1,6 +1,6 @@
 package com.example.soundboard
 
-data class Move(val name: String, val videoResId: Int)
+data class Move(val name: String, val videoResId: Int, val uri: String? = null)
 
 // Release packaging shortens file paths; the resource entry name retains the move name.
 internal fun moveFromResource(resourceName: String, packagedPath: String, resourceId: Int): Move? =

@@ -17,7 +17,7 @@ class PlayerActivity : Activity() {
         super.onCreate(savedInstanceState)
         val videoResId = intent.getIntExtra(VIDEO_EXTRA, 0)
         val loop = intent.getBooleanExtra(LOOP_EXTRA, false)
-        if (videoResId == 0) {
+        if (videoResId == 0 && intent.getStringExtra("uri") == null) {
             finish()
             return
         }
@@ -50,7 +50,7 @@ class PlayerActivity : Activity() {
         videoView.contentDescription = getString(R.string.close_video)
         root.setOnClickListener(closePlayer)
         setContentView(root)
-        videoView.setVideoURI(Uri.parse("android.resource://$packageName/$videoResId"))
+        videoView.setVideoURI(Uri.parse(intent.getStringExtra("uri") ?: "android.resource://$packageName/$videoResId"))
     }
 
     override fun onStop() {

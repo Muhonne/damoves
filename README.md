@@ -12,6 +12,8 @@ The launcher icon pairs the dancing woman and man emoji (💃🕺) from Google N
 - Tap the video to close it and return to the grid. Moves opened from a tile close on completion; dice selections repeat. Leaving the app closes playback.
 - Tap the floating dice button to loop a random move from the full library until closed, regardless of the search filter.
 - The sound toggle persists across launches.
+- Tap **Add clip**, select a video with the system gallery/document picker, and choose a range on the two-handle timeline. Fine-tune start/end in 0.5-second steps, preview, enter a move name, and tap **Save move**. A trimmed MP4 is saved privately in the app and appears in the grid, search, and dice selections, available offline. The original is untouched. Uninstalling the app removes imported moves.
+- Trimming uses fast lossless stream copying: the saved start snaps to the preceding video keyframe, so it can include a little extra footage before your selection. Export support depends on the source codecs; MP4 with H.264/AAC is recommended. No broad gallery permission is required.
 
 ## Add dance moves
 
