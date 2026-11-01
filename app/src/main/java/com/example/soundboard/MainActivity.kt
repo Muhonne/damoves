@@ -1,6 +1,7 @@
 package com.example.soundboard
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Bitmap
@@ -96,6 +97,11 @@ class MainActivity : Activity() {
             setOnItemClickListener { _, _, position, _ ->
                 openMove(moves[position])
             }
+            setOnItemLongClickListener { _, _, position, _ ->
+                val move = moves[position]
+                if (move.uri != null) showMoveOptions(move)
+                true
+            }
         }
         header.addView(Button(this).apply {
             text = "Add clip"
@@ -143,12 +149,14 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
-        if (::searchInput.isInitialized) {
-            allMoves = discoverMoves(resources) + SavedMoves.load(this)
-            moves = filterMoves(allMoves, searchInput.text.toString())
-            adapter.notifyDataSetChanged()
-            loadThumbnails()
-        }
+        if (::searchInput.isInitialized) reloadMoves()
+    }
+
+    private fun reloadMoves() {
+        allMoves = discoverMoves(resources) + SavedMoves.load(this)
+        moves = filterMoves(allMoves, searchInput.text.toString())
+        adapter.notifyDataSetChanged()
+        loadThumbnails()
     }
 
     @Deprecated("Platform callback")
@@ -170,6 +178,39 @@ class MainActivity : Activity() {
             .putExtra("uri", move.uri)
             .putExtra(PlayerActivity.VIDEO_EXTRA, move.videoResId)
             .putExtra(PlayerActivity.LOOP_EXTRA, loop))
+    }
+
+    private fun showMoveOptions(move: Move) {
+        val uri = move.uri ?: return
+        AlertDialog.Builder(this)
+            .setTitle(move.name)
+            .setItems(arrayOf("Edit clip", "Delete")) { _, option ->
+                when (option) {
+                    0 -> startActivity(Intent(this, ImportActivity::class.java)
+                        .setData(android.net.Uri.parse(uri))
+                        .putExtra(ImportActivity.NAME_EXTRA, move.name))
+                    1 -> confirmDelete(move)
+                }
+            }
+            .show()
+    }
+
+    private fun confirmDelete(move: Move) {
+        AlertDialog.Builder(this)
+            .setTitle(move.name)
+            .setMessage("Delete this clip? The original video stays where it is.")
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Delete") { _, _ -> deleteMove(move) }
+            .show()
+    }
+
+    private fun deleteMove(move: Move) {
+        val uri = move.uri ?: return
+        val deleted = SavedMoves.delete(this, uri)
+        Toast.makeText(this,
+            if (deleted) "Clip deleted" else "Could not delete this clip",
+            Toast.LENGTH_SHORT).show()
+        reloadMoves()
     }
 
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()

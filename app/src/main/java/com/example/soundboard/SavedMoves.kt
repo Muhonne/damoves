@@ -13,6 +13,15 @@ object SavedMoves {
             if (file.exists() && name is String) Move(name, 0, Uri.fromFile(file).toString()) else null
         }
 
+    fun delete(context: Context, uri: String): Boolean {
+        val id = importedMoveId(uri) ?: return false
+        val preferences = context.getSharedPreferences("imports", Context.MODE_PRIVATE)
+        if (!preferences.contains(id)) return false
+        val deleted = File(context.filesDir, "$id.mp4").delete()
+        preferences.edit().remove(id).apply()
+        return deleted
+    }
+
     // Stream-copy at sync boundaries: no codec dependency or loss of quality.
     fun save(context: Context, uri: Uri, name: String, startMs: Int, endMs: Int) {
         val id = java.util.UUID.randomUUID().toString()
@@ -65,4 +74,11 @@ object SavedMoves {
             muxer?.release()
         }
     }
+}
+
+// Imported clips are only ever written as "<id>.mp4" inside the app's own files directory.
+internal fun importedMoveId(uri: String): String? {
+    val fileName = uri.substringAfterLast('/', "")
+    if (!fileName.endsWith(".mp4")) return null
+    return fileName.removeSuffix(".mp4").takeIf { it.isNotEmpty() }
 }

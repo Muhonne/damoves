@@ -208,7 +208,7 @@ class ImportActivity : Activity() {
         controls.addView(editor)
         val nameInput = android.widget.EditText(this).apply {
             hint = "Move name"
-            setText(savedInstanceState?.getString("name").orEmpty())
+            setText(savedInstanceState?.getString("name") ?: intent.getStringExtra(NAME_EXTRA).orEmpty())
             tag = "moveName"
             setTextColor(Color.WHITE)
             setHintTextColor(Color.LTGRAY)
@@ -271,6 +271,7 @@ class ImportActivity : Activity() {
     companion object {
         const val VIDEO_EXTRA = "video"
         const val LOOP_EXTRA = "loop"
+        const val NAME_EXTRA = "moveName"
         private const val REPEAT_DELAY_MS = 400L
         private const val REPEAT_INTERVAL_MS = 120L
     }

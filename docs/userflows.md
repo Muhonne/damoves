@@ -45,6 +45,14 @@ The selection cannot be inverted: the start stays at least one step below the en
 
 The importer closes and the new move joins the grid, search, and dice selections, available offline like bundled moves. It is stored privately in the app: uninstalling Damoves removes imported moves.
 
+## Manage imported clips
+
+1. Press and hold an imported tile to open its options. Bundled moves shipped in the app do not respond, because they cannot be changed or removed.
+2. **Edit clip** re-opens that clip in the importer with its current name filled in, so you can adjust the range and save again.
+3. **Delete** asks for confirmation, then removes the clip and its name from the app.
+
+Editing works on the app's own trimmed copy, not the original gallery video: the app keeps no link back to the source file. Saving from the editor always writes a new move, so a re-trim leaves the earlier one in place until you delete it. Deleting an imported clip never touches the original video, which stays where it is.
+
 ## Sound
 
 - The header toggle mutes or unmutes playback and is labelled `Sound on` / `Sound off`.
