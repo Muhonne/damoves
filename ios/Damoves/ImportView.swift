@@ -8,11 +8,24 @@ struct ImportView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var phase
     @State private var player = AVPlayer()
-    @State private var range = ClipRange(duration: 0)
-    @State private var name = ""
+    @State private var editor = EditorCore()
     @State private var ready = false
-    @State private var previewing = false
-    @State private var saving = false
+    private var previewing: Bool { editor.previewing }
+    private var saving: Bool { editor.saving }
+    private var range: ClipRange {
+        var value = ClipRange(duration: Double(editor.duration) / 1000)
+        value.setStart(Double(editor.start) / 1000)
+        value.setEnd(Double(editor.end) / 1000)
+        return value
+    }
+    private var rangeBinding: Binding<ClipRange> {
+        Binding(get: { range }, set: { value in
+            let start = Int((value.start * 1000).rounded())
+            let end = Int((value.end * 1000).rounded())
+            if start != editor.start { editor.send(.setStart(start)) }
+            if end != editor.end { editor.send(.setEnd(end)) }
+        })
+    }
     @State private var error: String?
     @State private var observer: Any?
     @State private var statusObserver: NSKeyValueObservation?
@@ -24,7 +37,7 @@ struct ImportView: View {
                     VideoSurface(player: player).frame(height: 240).background(.black)
                     if ready {
                         Text(String(format: "Start %.2f s  —  End %.2f s", range.start, range.end))
-                        RangeTimeline(range: $range, changed: rangeChanged).frame(height: 55)
+                        RangeTimeline(range: rangeBinding, changed: rangeChanged).frame(height: 55)
                         HStack {
                             NudgeButton(title: "Start −") { nudge(start: true, by: -0.5) }
                             NudgeButton(title: "Start +") { nudge(start: true, by: 0.5) }
@@ -35,13 +48,14 @@ struct ImportView: View {
                             Button("−5s") { seekBy(-5) }
                             Spacer()
                             Button(previewing ? "Pause preview" : "Preview selection") {
-                                if previewing { player.pause(); previewing = false }
-                                else { seek(range.start); previewing = true; player.play() }
+                                editor.send(.togglePreview)
+                                if previewing { seek(range.start); player.play() }
+                                else { player.pause() }
                             }
                             Spacer()
                             Button("+5s") { seekBy(5) }
                         }.buttonStyle(.bordered)
-                        TextField("Move name", text: $name).textFieldStyle(.roundedBorder)
+                        TextField("Move name", text: Binding(get: { editor.name }, set: { editor.send(.setName($0)) })).textFieldStyle(.roundedBorder)
                         Text("Fast trim: the saved range may start at an earlier video keyframe.")
                             .font(.caption).foregroundStyle(.secondary)
                         Button(saving ? "Saving…" : "Save move") { save() }
@@ -58,7 +72,7 @@ struct ImportView: View {
             .task { await prepare() }
             .onReceive(NotificationCenter.default.publisher(for: .AVPlayerItemDidPlayToEndTime)) { notification in
                 if notification.object as? AVPlayerItem === player.currentItem && previewing {
-                    player.pause(); previewing = false; seek(range.start)
+                    player.pause(); editor.send(.previewEnded); seek(range.start)
                 }
             }
             .onChange(of: phase) { if $0 == .background && !saving { dismiss() } }
@@ -75,28 +89,29 @@ struct ImportView: View {
     }
 
     private func prepare() async {
-        name = source.name
+        editor.send(.setName(source.name))
         let asset = AVURLAsset(url: source.url)
         do {
             let duration = try await asset.load(.duration).seconds
             let playable = try await asset.load(.isPlayable)
             guard !Task.isCancelled else { return }
             guard playable, duration.isFinite, duration > 0 else { throw MoveStore.StoreError.export }
-            range = ClipRange(duration: duration)
+            let durationMs = max(1, Int((duration * 1000).rounded()))
+            editor.send(.prepare(duration: durationMs, start: 0, end: durationMs))
             let item = AVPlayerItem(asset: asset)
             statusObserver = item.observe(\.status, options: [.new]) { item, _ in
-                if item.status == .failed { DispatchQueue.main.async { error = "Could not open this video."; ready = false } }
+                if item.status == .failed { DispatchQueue.main.async { editor.send(.sourceFailed); error = editor.error; ready = false } }
             }
             try? AVAudioSession.sharedInstance().setCategory(.playback)
             player.replaceCurrentItem(with: item)
             player.isMuted = !sound
             observer = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.05, preferredTimescale: 600), queue: .main) { time in
                 if previewing && time.seconds >= range.end {
-                    player.pause(); previewing = false; seek(range.start)
+                    player.pause(); editor.send(.previewEnded); seek(range.start)
                 }
             }
             ready = true
-        } catch { self.error = "Could not open this video." }
+        } catch { editor.send(.sourceFailed); self.error = editor.error }
     }
 
     private func seek(_ seconds: Double) {
@@ -104,20 +119,29 @@ struct ImportView: View {
     }
     private func seekBy(_ seconds: Double) { seek(player.currentTime().seconds + seconds) }
     private func rangeChanged(_ start: Bool) {
-        player.pause(); previewing = false
+        player.pause(); editor.send(.previewEnded)
         seek(start ? range.start : max(0, range.end - 0.001))
     }
     private func nudge(start: Bool, by delta: Double) {
-        if start { range.setStart(range.start + delta) } else { range.setEnd(range.end + delta) }
+        let offset = Int((delta * 1000).rounded())
+        if start { editor.send(.setStart(editor.start + offset)) } else { editor.send(.setEnd(editor.end + offset)) }
         rangeChanged(start)
     }
     private func save() {
-        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { error = "Enter a move name."; return }
-        player.pause(); previewing = false; saving = true
+        guard !saving else { return }
+        editor.send(.save)
+        guard saving, let request = editor.pendingSave else { error = editor.error; return }
+        var selectedRange = ClipRange(duration: Double(editor.duration) / 1000)
+        selectedRange.setStart(Double(request.start) / 1000)
+        selectedRange.setEnd(Double(request.end) / 1000)
+        player.pause()
         Task {
-            do { try await store.save(source: source.url, name: trimmed, range: range); saving = false; dismiss() }
-            catch { saving = false; self.error = "Could not save this video. Try an MP4 video." }
+            do {
+                try await store.save(source: source.url, name: request.name, range: selectedRange)
+                editor.send(.saveFinished(true)); dismiss()
+            } catch {
+                editor.send(.saveFinished(false)); self.error = editor.error
+            }
         }
     }
 }

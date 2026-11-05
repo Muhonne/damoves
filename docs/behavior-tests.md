@@ -1,6 +1,6 @@
 # Headless behavior tests
 
-[Shopify's Reflex article](https://shopify.engineering/reflex) describes an architecture, not a published library. Damoves implements a small subset: a UI-independent browse model per platform, an action/state interface, deterministic fixtures, and one suite that runs against both models. There is no Shopify dependency and no introspection server in either app.
+[Shopify's Reflex article](https://shopify.engineering/reflex) describes an architecture, not a published library. Damoves implements a subset: UI-independent feature cores per platform, an action/state interface, deterministic fixtures, and one suite that runs against both implementations. There is no Shopify dependency and no introspection server in either app.
 
 ## Run
 
@@ -14,11 +14,11 @@ The script compiles the Swift host into a temporary directory and builds the JVM
 
 GitHub Actions runs this same command on a macOS runner for pushes and pull requests; it can also be started manually from the Actions tab. The workflow is `.github/workflows/behavior-tests.yml`. It does not build the mobile apps or run their separate unit or device tests.
 
-`ios/Damoves/BrowseCore.swift` and `android/app/src/main/java/com/example/soundboard/BrowseCore.kt` are the actual implementations used by the browse screens. `ios/BehaviorHost/` and `android/behaviorHost/` adapt those models to newline-delimited JSON on stdin/stdout; they are not part of the mobile apps. `tests/behavior/browse.test.mjs` runs the same journeys on each host. It uses deterministic random selection and explicit fixture moves/sound state, without accessing personal clips or preferences.
+`BrowseCore`, `EditorCore`, `PlayerCore`, and `NavigationCore` in `ios/Damoves/` and `android/app/src/main/java/com/example/soundboard/` are used by the mobile apps. `ios/BehaviorHost/` and `android/behaviorHost/` adapt those cores to newline-delimited JSON on stdin/stdout; they are not part of the mobile apps. `tests/behavior/browse.test.mjs` runs the same scenarios on each host. It uses deterministic random selection and fixture media, storage outcomes, and sound preferences without accessing personal clips or preferences.
 
 ## Contract
 
-Each line is one JSON request and gets one JSON response. `init` resets the session with `moves` (objects with unique string `id` and `name`), an integer `randomIndex`, and boolean `soundEnabled`. `ls` returns the browse node, state and available actions. `do` dispatches `search` (`value`: string), `setSound` (`enabled`: boolean), `open` (`id`: string), `rollDice`, or `clearChoice`. A successful response has `ok: true`, `name: "Browse"`, `actions`, and `state`. `state.choice` is the selection emitted to the UI, not a live playback status. Invalid requests return `ok: false` and do not mutate the model.
+Each line is one JSON request and gets one JSON response. `init` resets the browse node with `moves` (objects with unique string `id` and `name`, optionally boolean `imported`), an integer `randomIndex`, and boolean `soundEnabled`. An optional boolean `deleteSucceeds` controls the deletion fixture. `ls` returns the focused node, state and available actions. Browse `do` actions are `search` (`value`: string), `setSound` (`enabled`: boolean), `open` (`id`: string), `rollDice`, `clearChoice`, `requestDelete` (`id`), `cancelDelete`, and `confirmDelete`. A successful response has `ok: true`, `name`, `actions`, and `state`. `state.choice` is the selection emitted to the UI, not a live playback status. `restart` reconstructs the browse core using the same in-memory sound preference and library; this checks the preference boundary, not OS persistence. Invalid requests return `ok: false` and do not mutate the model.
 
 For example, after running `./tests/behavior/run.sh`, explore the JVM host with:
 
@@ -37,8 +37,12 @@ Then enter one request per line:
 
 The dice returns `turn` with `loop: true` even though it is filtered out. Finish with Ctrl-D. The Swift host is compiled temporarily by the runner and uses the same protocol.
 
+`initEditor` selects the editor node using a synthetic fixture: `duration` is a positive integer in milliseconds, `name` is the initial name, `sourceAvailable` optionally simulates source failure, and `saveSucceeds` controls the export result. Editor actions are `setStart`/`setEnd` (integer milliseconds), `setName`, `togglePreview`, `previewEnded`, `save`, `completeSave`, and `clearError`. The host records the core's export request in `lastExport` and dispatches the fixture result; `deferSave: true` delays it until `completeSave`. The apps pass that request to the native export service and dispatch its result. No real video is read or written.
+
+`initPlayer` accepts `loop` and exposes `completed`, `close`, `leave`, and `failed` simulated media/lifecycle events. `initNavigation` exposes `openPlayer`, `openEditor`, and `close`. These initialize individual cores, not a single end-to-end screen tree; system picker presentation and the glue between cores are still platform-owned.
+
 ## Coverage and limits
 
-The shared journeys cover case-insensitive partial search, whitespace, no matches, a visible tile's one-shot selection, rejection of hidden tiles, dice selection from the full library, empty libraries, sound state, and malformed actions. They exercise browse decisions, not rendering or native playback. The deterministic picker tests the selected index and looping flag, not randomness distribution. Sound persistence is provided by platform storage and is not tested by the headless fixture.
+Shared scenarios cover search, tile and full-library dice selection, empty libraries, sound preference reconstruction, navigation guards, playback completion/close/failure decisions, delete confirmation and outcomes, editor range clamping, preview, source failure, name validation, export requests and outcomes, and malformed actions. Media and delete results are simulated; the deterministic picker does not test randomness distribution.
 
-The importer, trim/export, imported clip storage/deletion, actual audio/video playback and completion, lifecycle, thumbnails, accessibility, and picker integrations have not been moved into the headless core. Continue to test these on devices or simulators as described in the README. When adding journeys, wire actions through code used by the real app; avoid implementing a separate test-only version of the behavior. Extend the protocol and tests on both platforms together.
+Actual trim/export, imported clip files and OS preferences, playback and completion callbacks, lifecycle, thumbnails, accessibility, picker integrations, and interactions between cores and native screens are not exercised by these fixtures. In particular, a save does not add a fixture move to a live browse screen: a full import-to-grid journey is not yet covered. Continue device and simulator checks as described in the README. When extending coverage, wire actions through code used by the real app; avoid implementing a separate test-only version of behavior. Extend the protocol and tests on both platforms together.

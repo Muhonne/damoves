@@ -18,7 +18,7 @@ object SavedMoves {
         val preferences = context.getSharedPreferences("imports", Context.MODE_PRIVATE)
         if (!preferences.contains(id)) return false
         val deleted = File(context.filesDir, "$id.mp4").delete()
-        preferences.edit().remove(id).apply()
+        if (deleted) preferences.edit().remove(id).apply()
         return deleted
     }
 

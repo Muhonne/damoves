@@ -17,6 +17,12 @@ Help dancers check dance-move videos quickly between songs. Prioritize finding a
 - Keep the UI minimal and dark. Refer to dance clips as moves; sound refers only to audio settings.
 - Update the [README](README.md) for setup changes and [User flows](docs/userflows.md) for behavior changes.
 
+## Feature tests
+
+- Use the [Reflex architecture](https://shopify.engineering/reflex) for feature coverage: one shared, platform-independent journey suite drives the real Swift and Kotlin feature cores through their state-and-actions introspection contract.
+- Keep feature logic and navigation in UI-independent cores; inject fixtures for media, persistence, randomness, and other platform boundaries. Do not reimplement app behavior in the test hosts or rely on separate platform-specific feature tests.
+- Extend the same journeys and fixtures for both platforms when adding behavior. Headless tests do not validate actual codecs, system pickers, rendering, or lifecycle integration; keep the device checks below for those boundaries.
+
 ## Documentation
 
 - [README](README.md): what Damoves is, use, adding moves, build, signed release, tests, device checks.
@@ -26,7 +32,7 @@ Help dancers check dance-move videos quickly between songs. Prioritize finding a
 
 ## Validation
 
-For shared browse behavior or headless test changes, run `./tests/behavior/run.sh`. For Android changes, run `cd android && ./gradlew :app:testDebugUnitTest :app:assembleDebug :app:lintDebug`. For iOS changes, run `cd ios && swift test` and build the Xcode project for an iOS simulator. For playback or UI changes, check affected behavior on the relevant device or emulator, including completion, tap-to-close, Back (Android), Home, search, rotation, and mute persistence.
+For shared feature behavior or headless test changes, run `./tests/behavior/run.sh`. For Android changes, run `cd android && ./gradlew :app:testDebugUnitTest :app:assembleDebug :app:lintDebug`. For iOS changes, run `cd ios && swift test` and build the Xcode project for an iOS simulator. For playback or UI changes, check affected behavior on the relevant device or emulator, including completion, tap-to-close, Back (Android), Home, search, rotation, and mute persistence.
 For Android release/signing changes, also run `./gradlew :app:assembleRelease :app:lintRelease` from `android/` and verify the APK signature. Keep release signing material outside the repository.
 
 ## Git

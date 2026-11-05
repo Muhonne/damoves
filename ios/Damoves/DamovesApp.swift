@@ -36,12 +36,17 @@ private struct PhotoVideo: Transferable {
     }
 }
 
+private struct SystemSoundPreferences: SoundPreferences {
+    func load() -> Bool { UserDefaults.standard.object(forKey: "soundEnabled") as? Bool ?? true }
+    func save(_ enabled: Bool) { UserDefaults.standard.set(enabled, forKey: "soundEnabled") }
+}
+
 struct BrowseView: View {
     @StateObject private var store = MoveStore()
-    @AppStorage("soundEnabled") private var sound = true
     @Environment(\.scenePhase) private var phase
     @State private var query = ""
-    @State private var browse = BrowseCore()
+    @State private var browse = BrowseCore(soundPreferences: SystemSoundPreferences())
+    @State private var navigation = NavigationCore()
     @State private var playback: Playback?
     @State private var editor: EditorSource?
     @State private var filePicker = false
@@ -55,13 +60,23 @@ struct BrowseView: View {
     }
 
     private func updateMoves() {
-        browse.send(.replaceMoves(store.moves.map { BrowseMove(id: $0.url.absoluteString, name: $0.name) }))
+        browse.send(.replaceMoves(store.moves.map { BrowseMove(id: $0.url.absoluteString, name: $0.name, imported: $0.imported) }))
     }
 
     private func playChoice() {
-        guard let choice = browse.choice,
+        guard navigation.screen == .browse, let choice = browse.choice,
               let move = store.moves.first(where: { $0.url.absoluteString == choice.id }) else { return }
+        navigation.send(.openPlayer)
         playback = Playback(move: move, loop: choice.loop)
+    }
+
+    private func openEditor(_ source: EditorSource) {
+        guard navigation.screen == .browse else {
+            if source.temporary { try? FileManager.default.removeItem(at: source.url) }
+            return
+        }
+        navigation.send(.openEditor)
+        editor = source
     }
 
     var body: some View {
@@ -76,7 +91,7 @@ struct BrowseView: View {
                     }
                     Toggle(browse.soundEnabled ? "Sound on" : "Sound off", isOn: Binding(
                         get: { browse.soundEnabled },
-                        set: { browse.send(.setSound($0)); sound = $0 }
+                        set: { browse.send(.setSound($0)) }
                     )).font(.caption).fixedSize()
                 }
                 TextField("Search moves", text: $query)
@@ -92,8 +107,11 @@ struct BrowseView: View {
                                 .buttonStyle(.plain)
                                 .contextMenu {
                                     if move.imported {
-                                        Button("Edit clip") { editor = EditorSource(url: move.url, name: move.name, temporary: false) }
-                                        Button("Delete", role: .destructive) { deleting = move }
+                                        Button("Edit clip") { openEditor(EditorSource(url: move.url, name: move.name, temporary: false)) }
+                                        Button("Delete", role: .destructive) {
+                                            browse.send(.requestDelete(move.url.absoluteString))
+                                            if browse.pendingDelete != nil { deleting = move }
+                                        }
                                     }
                                 }
                         }
@@ -108,14 +126,13 @@ struct BrowseView: View {
             }
         }
         .background(Color(red: 0.06, green: 0.07, blue: 0.08))
-        .onAppear { updateMoves(); browse.send(.setSound(sound)) }
-        .onChange(of: sound) { browse.send(.setSound($0)) }
+        .onAppear { updateMoves(); browse.send(.restoreSound) }
         .onChange(of: store.moves) { _ in updateMoves() }
         .onChange(of: query) { browse.send(.search($0)) }
-        .fullScreenCover(item: $playback, onDismiss: { browse.send(.clearChoice) }) { selection in
+        .fullScreenCover(item: $playback, onDismiss: { navigation.send(.close); browse.send(.clearChoice) }) { selection in
             PlaybackView(selection: selection, sound: browse.soundEnabled) { playback = nil; error = "Could not play this video." }
         }
-        .sheet(item: $editor, onDismiss: { store.reload() }) { source in
+        .sheet(item: $editor, onDismiss: { navigation.send(.close); store.reload() }) { source in
             ImportView(source: source, store: store, sound: browse.soundEnabled)
         }
         .fileImporter(isPresented: $filePicker, allowedContentTypes: [.movie]) { result in
@@ -126,7 +143,7 @@ struct BrowseView: View {
                 let copy = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
                     .appendingPathExtension(url.pathExtension)
                 try FileManager.default.copyItem(at: url, to: copy)
-                editor = EditorSource(url: copy, name: "", temporary: true)
+                openEditor(EditorSource(url: copy, name: "", temporary: true))
             } catch { self.error = "Could not open this video." }
         }
         .onChange(of: photo) { item in
@@ -134,7 +151,7 @@ struct BrowseView: View {
             Task {
                 do {
                     guard let video = try await item.loadTransferable(type: PhotoVideo.self) else { throw MoveStore.StoreError.export }
-                    editor = EditorSource(url: video.url, name: "", temporary: true)
+                    openEditor(EditorSource(url: video.url, name: "", temporary: true))
                 } catch { self.error = "Could not open this video." }
                 photo = nil
             }
@@ -142,10 +159,13 @@ struct BrowseView: View {
         .onChange(of: phase) { if $0 == .background { playback = nil } }
         .alert("Delete clip?", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), presenting: deleting) { move in
             Button("Delete", role: .destructive) {
-                do { try store.delete(move) } catch { self.error = "Could not delete this clip." }
+                browse.send(.confirmDelete)
+                guard browse.deleting else { return }
+                do { try store.delete(move); browse.send(.deleteFinished(true)) }
+                catch { browse.send(.deleteFinished(false)); self.error = browse.deleteError }
                 deleting = nil
             }
-            Button("Cancel", role: .cancel) { deleting = nil }
+            Button("Cancel", role: .cancel) { browse.send(.cancelDelete); deleting = nil }
         } message: { _ in Text("The original video stays where it is.") }
         .alert("Damoves", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
             Button("OK") { error = nil }
@@ -204,15 +224,30 @@ private struct PlaybackView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var player = AVPlayer()
     @State private var observation: NSKeyValueObservation?
+    @State private var core: PlayerCore
+
+    init(selection: Playback, sound: Bool, failed: @escaping () -> Void) {
+        self.selection = selection
+        self.sound = sound
+        self.failed = failed
+        _core = State(initialValue: PlayerCore(loop: selection.loop))
+    }
+
+    private func failPlayback() {
+        guard !core.closed else { return }
+        core.send(.failed)
+        if core.error != nil { failed() }
+    }
+
     var body: some View {
         VideoSurface(player: player).background(.black).ignoresSafeArea()
-            .contentShape(Rectangle()).onTapGesture { dismiss() }
+            .contentShape(Rectangle()).onTapGesture { core.send(.close); dismiss() }
             .accessibilityLabel("Close video").accessibilityAddTraits(.isButton)
             .onAppear {
                 try? AVAudioSession.sharedInstance().setCategory(.playback)
                 let item = AVPlayerItem(url: selection.move.url)
                 observation = item.observe(\.status, options: [.initial, .new]) { item, _ in
-                    if item.status == .failed { DispatchQueue.main.async { failed() } }
+                    if item.status == .failed { DispatchQueue.main.async { failPlayback() } }
                 }
                 player.replaceCurrentItem(with: item)
                 player.isMuted = !sound
@@ -220,12 +255,15 @@ private struct PlaybackView: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: .AVPlayerItemDidPlayToEndTime)) { notification in
                 guard notification.object as? AVPlayerItem === player.currentItem else { return }
-                if selection.loop { player.seek(to: .zero); player.play() } else { dismiss() }
+                guard !core.closed else { return }
+                core.send(.completed)
+                if core.closed { dismiss() } else { player.seek(to: .zero); player.play() }
             }
             .onReceive(NotificationCenter.default.publisher(for: .AVPlayerItemFailedToPlayToEndTime)) { notification in
-                if notification.object as? AVPlayerItem === player.currentItem { failed() }
+                if notification.object as? AVPlayerItem === player.currentItem { failPlayback() }
             }
             .onDisappear {
+                core.send(.leave)
                 player.pause(); player.replaceCurrentItem(with: nil); observation = nil
                 try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
             }

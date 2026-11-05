@@ -14,7 +14,8 @@ class ImportActivity : Activity() {
     private lateinit var videoView: VideoView
     private var mediaPlayer: android.media.MediaPlayer? = null
     private var editing = false
-    private var previewing = false
+    private val editor = EditorCore()
+    private val previewing get() = editor.previewing
     private lateinit var timeline: ClipTimeline
     private lateinit var rangeLabel: android.widget.TextView
     private lateinit var previewButton: android.widget.Button
@@ -23,7 +24,7 @@ class ImportActivity : Activity() {
     private val checkRange = object : Runnable {
         override fun run() {
             if (editing && previewing && videoView.currentPosition >= timeline.end) {
-                previewing = false
+                editor.send(EditorCore.Action.PreviewEnded)
                 videoView.pause()
                 videoView.seekTo(timeline.start)
                 updatePreviewButton()
@@ -33,7 +34,6 @@ class ImportActivity : Activity() {
     }
 
     private fun updateRange(startChanged: Boolean) {
-        previewing = false
         videoView.pause()
         videoView.seekTo(if (startChanged) timeline.start else (timeline.end - 1).coerceAtLeast(0))
         rangeLabel.text = java.lang.String.format(java.util.Locale.US,
@@ -54,8 +54,10 @@ class ImportActivity : Activity() {
     }
 
     private fun nudge(startChanged: Boolean, deltaMs: Int) {
-        if (startChanged) timeline.start = (timeline.start + deltaMs).coerceIn(0, timeline.end - 1)
-        else timeline.end = (timeline.end + deltaMs).coerceIn(timeline.start + 1, timeline.duration)
+        if (startChanged) editor.send(EditorCore.Action.SetStart(editor.start + deltaMs))
+        else editor.send(EditorCore.Action.SetEnd(editor.end + deltaMs))
+        timeline.start = editor.start
+        timeline.end = editor.end
         updateRange(startChanged)
     }
 
@@ -124,9 +126,12 @@ class ImportActivity : Activity() {
                 val volume = if (enabled) 1f else 0f
                 player.setVolume(volume, volume)
                 player.isLooping = loop && !editing
-                timeline.duration = duration.coerceAtLeast(1)
-                timeline.start = savedInstanceState?.getInt("start", 0)?.coerceIn(0, timeline.duration - 1) ?: 0
-                timeline.end = savedInstanceState?.getInt("end", timeline.duration)?.coerceIn(timeline.start + 1, timeline.duration) ?: timeline.duration
+                val length = duration.coerceAtLeast(1)
+                editor.send(EditorCore.Action.Prepare(length, savedInstanceState?.getInt("start", 0) ?: 0,
+                    savedInstanceState?.getInt("end", length) ?: length))
+                timeline.duration = editor.duration
+                timeline.start = editor.start
+                timeline.end = editor.end
                 timeline.invalidate()
                 editing = true
                 player.isLooping = false
@@ -134,11 +139,12 @@ class ImportActivity : Activity() {
             }
             setOnCompletionListener {
                 if (editing) {
-                    previewing = false
+                    editor.send(EditorCore.Action.PreviewEnded)
                     seekTo(timeline.start)
                 } else if (!loop) finish()
             }
             setOnErrorListener { _, _, _ ->
+                editor.send(EditorCore.Action.SourceFailed)
                 Toast.makeText(this@ImportActivity, R.string.playback_error, Toast.LENGTH_SHORT).show()
                 finish()
                 true
@@ -158,7 +164,7 @@ class ImportActivity : Activity() {
             orientation = android.widget.LinearLayout.VERTICAL
             setBackgroundColor(0xDD000000.toInt())
         }
-        val editor = android.widget.LinearLayout(this).apply {
+        val editorLayout = android.widget.LinearLayout(this).apply {
             orientation = android.widget.LinearLayout.VERTICAL
             visibility = View.VISIBLE
         }
@@ -168,16 +174,20 @@ class ImportActivity : Activity() {
         }
         timeline = ClipTimeline(this).apply {
             contentDescription = "Clip start and end; use the buttons below for fine adjustment"
-            onChange = { updateRange(it) }
+            onChange = { startChanged ->
+                if (startChanged) editor.send(EditorCore.Action.SetStart(start))
+                else editor.send(EditorCore.Action.SetEnd(end))
+                updateRange(startChanged)
+            }
         }
-        editor.addView(rangeLabel)
-        editor.addView(timeline, android.widget.LinearLayout.LayoutParams(-1, (64 * resources.displayMetrics.density).toInt()))
+        editorLayout.addView(rangeLabel)
+        editorLayout.addView(timeline, android.widget.LinearLayout.LayoutParams(-1, (64 * resources.displayMetrics.density).toInt()))
         val fine = android.widget.LinearLayout(this)
         addNudgeButton(fine, "Start −", true, -500)
         addNudgeButton(fine, "Start +", true, 500)
         addNudgeButton(fine, "End −", false, -500)
         addNudgeButton(fine, "End +", false, 500)
-        editor.addView(fine)
+        editorLayout.addView(fine)
         val previewRow = android.widget.LinearLayout(this)
         previewRow.addView(android.widget.Button(this).apply {
             text = "−5s"
@@ -187,14 +197,11 @@ class ImportActivity : Activity() {
         previewButton = android.widget.Button(this).apply {
             text = "Preview selection"
             setOnClickListener {
+                editor.send(EditorCore.Action.TogglePreview)
                 if (previewing) {
-                    previewing = false
-                    videoView.pause()
-                } else {
                     videoView.seekTo(timeline.start)
-                    previewing = true
                     videoView.start()
-                }
+                } else videoView.pause()
                 updatePreviewButton()
             }
         }
@@ -204,8 +211,8 @@ class ImportActivity : Activity() {
             contentDescription = "Forward 5 seconds"
             setOnClickListener { seekBy(5000) }
         }, android.widget.LinearLayout.LayoutParams(0, -2, 1f))
-        editor.addView(previewRow)
-        controls.addView(editor)
+        editorLayout.addView(previewRow)
+        controls.addView(editorLayout)
         val nameInput = android.widget.EditText(this).apply {
             hint = "Move name"
             setText(savedInstanceState?.getString("name") ?: intent.getStringExtra(NAME_EXTRA).orEmpty())
@@ -214,6 +221,14 @@ class ImportActivity : Activity() {
             setHintTextColor(Color.LTGRAY)
             setSingleLine()
         }
+        editor.send(EditorCore.Action.SetName(nameInput.text.toString()))
+        nameInput.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                editor.send(EditorCore.Action.SetName(s.toString()))
+            }
+            override fun afterTextChanged(s: android.text.Editable?) {}
+        })
         controls.addView(nameInput)
         controls.addView(android.widget.TextView(this).apply {
             text = "Fast trim: saved start snaps to the preceding video keyframe."
@@ -222,21 +237,20 @@ class ImportActivity : Activity() {
         controls.addView(android.widget.Button(this).apply {
             text = "Save move"
             setOnClickListener {
-                val name = nameInput.text.toString().trim()
-                if (name.isEmpty()) { nameInput.error = "Enter a move name"; return@setOnClickListener }
                 if (videoView.duration <= 0) return@setOnClickListener
+                editor.send(EditorCore.Action.Save)
+                val request = editor.pendingSave
+                if (request == null) { nameInput.error = editor.error; return@setOnClickListener }
                 videoView.pause()
-                previewing = false
                 updatePreviewButton()
                 isEnabled = false
                 text = "Saving…"
-                val start = timeline.start
-                val end = timeline.end
                 Thread {
-                    val result = runCatching { SavedMoves.save(applicationContext, source, name, start, end) }
+                    val result = runCatching { SavedMoves.save(applicationContext, source, request.name, request.start, request.end) }
                     runOnUiThread {
                         if (!isDestroyed) {
-                            if (result.isSuccess) finish() else {
+                            editor.send(EditorCore.Action.SaveFinished(result.isSuccess))
+                            if (editor.saved) finish() else {
                                 isEnabled = true
                                 text = "Save move"
                                 Toast.makeText(this@ImportActivity, "Could not save this video. Try an MP4 video.", Toast.LENGTH_LONG).show()

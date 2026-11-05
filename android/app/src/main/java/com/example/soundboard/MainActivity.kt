@@ -22,7 +22,8 @@ import android.widget.*
 class MainActivity : Activity() {
     private lateinit var allMoves: List<Move>
     private var moves = emptyList<Move>()
-    private val browse = BrowseCore()
+    private lateinit var browse: BrowseCore
+    private val navigation = NavigationCore()
     private val adapter = MoveAdapter()
     private lateinit var searchInput: EditText
     private val thumbnails = mutableMapOf<Move, Bitmap>()
@@ -30,6 +31,11 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val preferences = getSharedPreferences(SOUND_PREFS, MODE_PRIVATE)
+        browse = BrowseCore(soundPreferences = object : SoundPreferences {
+            override fun load() = preferences.getBoolean(KEY_SOUND_ENABLED, true)
+            override fun save(enabled: Boolean) { preferences.edit().putBoolean(KEY_SOUND_ENABLED, enabled).apply() }
+        })
         allMoves = discoverMoves(resources) + SavedMoves.load(this)
         updateBrowseMoves()
         val root = FrameLayout(this).apply {
@@ -74,14 +80,11 @@ class MainActivity : Activity() {
                 override fun afterTextChanged(s: Editable?) {}
             })
         }
-        val preferences = getSharedPreferences(SOUND_PREFS, MODE_PRIVATE)
-        browse.send(BrowseCore.Action.SetSound(preferences.getBoolean(KEY_SOUND_ENABLED, true)))
         val toggle = Switch(this).apply {
             isChecked = browse.soundEnabled
             setText(if (isChecked) R.string.sound_on else R.string.sound_off)
             setOnCheckedChangeListener { _, enabled ->
                 browse.send(BrowseCore.Action.SetSound(enabled))
-                preferences.edit().putBoolean(KEY_SOUND_ENABLED, browse.soundEnabled).apply()
                 setText(if (enabled) R.string.sound_on else R.string.sound_off)
             }
             textSize = 13f
@@ -165,7 +168,7 @@ class MainActivity : Activity() {
     }
 
     private fun updateBrowseMoves() {
-        browse.send(BrowseCore.Action.ReplaceMoves(allMoves.mapIndexed { index, move -> BrowseMove(index.toString(), move.name) }))
+        browse.send(BrowseCore.Action.ReplaceMoves(allMoves.mapIndexed { index, move -> BrowseMove(index.toString(), move.name, move.uri != null) }))
         refreshVisibleMoves()
     }
 
@@ -182,9 +185,11 @@ class MainActivity : Activity() {
     @Deprecated("Platform callback")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == 100 && resultCode == RESULT_OK && data?.data != null) {
-            startActivity(Intent(this, ImportActivity::class.java).setData(data.data)
-                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
+        if (requestCode == 101 || requestCode == 102) navigation.send(NavigationCore.Action.Close)
+        if (requestCode == 100 && resultCode == RESULT_OK && data?.data != null && navigation.screen == NavigationCore.Screen.BROWSE) {
+            navigation.send(NavigationCore.Action.OpenEditor)
+            startActivityForResult(Intent(this, ImportActivity::class.java).setData(data.data)
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION), 102)
         }
     }
 
@@ -194,10 +199,12 @@ class MainActivity : Activity() {
     }
 
     private fun openMove(move: Move, loop: Boolean = false) {
-        startActivity(Intent(this, PlayerActivity::class.java)
+        if (navigation.screen != NavigationCore.Screen.BROWSE) return
+        navigation.send(NavigationCore.Action.OpenPlayer)
+        startActivityForResult(Intent(this, PlayerActivity::class.java)
             .putExtra("uri", move.uri)
             .putExtra(PlayerActivity.VIDEO_EXTRA, move.videoResId)
-            .putExtra(PlayerActivity.LOOP_EXTRA, loop))
+            .putExtra(PlayerActivity.LOOP_EXTRA, loop), 101)
     }
 
     private fun showMoveOptions(move: Move) {
@@ -206,9 +213,14 @@ class MainActivity : Activity() {
             .setTitle(move.name)
             .setItems(arrayOf("Edit clip", "Delete")) { _, option ->
                 when (option) {
-                    0 -> startActivity(Intent(this, ImportActivity::class.java)
-                        .setData(android.net.Uri.parse(uri))
-                        .putExtra(ImportActivity.NAME_EXTRA, move.name))
+                    0 -> {
+                        if (navigation.screen == NavigationCore.Screen.BROWSE) {
+                            navigation.send(NavigationCore.Action.OpenEditor)
+                            startActivityForResult(Intent(this, ImportActivity::class.java)
+                                .setData(android.net.Uri.parse(uri))
+                                .putExtra(ImportActivity.NAME_EXTRA, move.name), 102)
+                        }
+                    }
                     1 -> confirmDelete(move)
                 }
             }
@@ -216,17 +228,24 @@ class MainActivity : Activity() {
     }
 
     private fun confirmDelete(move: Move) {
+        browse.send(BrowseCore.Action.RequestDelete(allMoves.indexOf(move).toString()))
+        if (browse.pendingDelete == null) return
         AlertDialog.Builder(this)
             .setTitle(move.name)
             .setMessage("Delete this clip? The original video stays where it is.")
-            .setNegativeButton("Cancel", null)
-            .setPositiveButton("Delete") { _, _ -> deleteMove(move) }
+            .setNegativeButton("Cancel") { _, _ -> browse.send(BrowseCore.Action.CancelDelete) }
+            .setOnCancelListener { browse.send(BrowseCore.Action.CancelDelete) }
+            .setPositiveButton("Delete") { _, _ ->
+                browse.send(BrowseCore.Action.ConfirmDelete)
+                if (browse.deleting) deleteMove(move)
+            }
             .show()
     }
 
     private fun deleteMove(move: Move) {
         val uri = move.uri ?: return
         val deleted = SavedMoves.delete(this, uri)
+        browse.send(BrowseCore.Action.DeleteFinished(deleted))
         Toast.makeText(this,
             if (deleted) "Clip deleted" else "Could not delete this clip",
             Toast.LENGTH_SHORT).show()

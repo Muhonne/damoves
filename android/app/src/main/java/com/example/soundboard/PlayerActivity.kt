@@ -12,11 +12,13 @@ import android.view.View
 
 class PlayerActivity : Activity() {
     private lateinit var videoView: VideoView
+    private lateinit var playback: PlayerCore
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val videoResId = intent.getIntExtra(VIDEO_EXTRA, 0)
         val loop = intent.getBooleanExtra(LOOP_EXTRA, false)
+        playback = PlayerCore(loop)
         if (videoResId == 0 && intent.getStringExtra("uri") == null) {
             finish()
             return
@@ -31,18 +33,23 @@ class PlayerActivity : Activity() {
                     .getBoolean(MainActivity.KEY_SOUND_ENABLED, true)
                 val volume = if (enabled) 1f else 0f
                 player.setVolume(volume, volume)
-                player.isLooping = loop
+                player.isLooping = playback.loop
                 start()
             }
-            setOnCompletionListener { if (!loop) finish() }
+            setOnCompletionListener {
+                playback.send(PlayerCore.Action.Completed)
+                if (playback.closed) finish() else { seekTo(0); start() }
+            }
             setOnErrorListener { _, _, _ ->
-                Toast.makeText(this@PlayerActivity, R.string.playback_error, Toast.LENGTH_SHORT).show()
+                playback.send(PlayerCore.Action.Failed)
+                if (playback.error != null) Toast.makeText(this@PlayerActivity, R.string.playback_error, Toast.LENGTH_SHORT).show()
                 finish()
                 true
             }
         }
         root.addView(videoView, FrameLayout.LayoutParams(-1, -1, Gravity.CENTER))
         val closePlayer = View.OnClickListener {
+            playback.send(PlayerCore.Action.Close)
             videoView.stopPlayback()
             finish()
         }
@@ -54,6 +61,7 @@ class PlayerActivity : Activity() {
     }
 
     override fun onStop() {
+        if (::playback.isInitialized) playback.send(PlayerCore.Action.Leave)
         if (::videoView.isInitialized) videoView.stopPlayback()
         super.onStop()
         finish()

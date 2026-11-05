@@ -5,7 +5,7 @@ let package = Package(
     name: "DamovesLogic",
     products: [.library(name: "DamovesLogic", targets: ["DamovesLogic"])],
     targets: [
-        .target(name: "DamovesLogic", path: "Damoves", exclude: ["DamovesApp.swift", "ImportView.swift", "MoveStore.swift", "Videos"], sources: ["MoveLogic.swift", "BrowseCore.swift"]),
+        .target(name: "DamovesLogic", path: "Damoves", exclude: ["DamovesApp.swift", "ImportView.swift", "MoveStore.swift", "Videos"], sources: ["MoveLogic.swift", "BrowseCore.swift", "EditorCore.swift", "PlayerCore.swift", "NavigationCore.swift"]),
         .testTarget(name: "DamovesLogicTests", dependencies: ["DamovesLogic"], path: "Tests")
     ]
 )

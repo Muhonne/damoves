@@ -61,10 +61,10 @@ xcodebuild -project Damoves.xcodeproj -scheme Damoves -sdk iphonesimulator CODE_
 
 ## Tests and device checks
 
-The same headless behavior journeys run against the Swift and Kotlin browse cores used by the apps, locally and in GitHub Actions on pushes and pull requests. They exercise search, tile selection, dice selection independent of search, and sound state without a simulator. This is a small Reflex-style implementation, not a Shopify library; see [Behavior tests](docs/behavior-tests.md) for the protocol, prerequisites, and coverage limits.
+The same headless behavior scenarios run against the Swift and Kotlin feature cores used by the apps, locally and in GitHub Actions on pushes and pull requests. They exercise browse, sound, navigation, playback, deletion, and editor decisions with fixtures, without a simulator. This is a small Reflex-style implementation, not a Shopify library; see [Behavior tests](docs/behavior-tests.md) for the protocol, prerequisites, and coverage limits.
 
 ```sh
 ./tests/behavior/run.sh
 ```
 
-Android JVM tests also cover search and discovery; iOS Swift package tests cover names, search, and range clamping. These tests do not replace device checks. On each platform verify aspect ratio, tile completion, dice looping, tap-to-close, Home, search, rotation, sound persistence, import preview/save/edit/delete, and error handling. On Android also check Back. Verify long labels, the fixed header and the last row clearing the dice.
+GitHub Actions runs only the shared headless suite; it does not build the apps or run the Android JVM, iOS Swift package, or device tests. The headless media fixtures simulate results rather than using video files. Android JVM tests also cover search and discovery; iOS Swift package tests cover names, search, and range clamping. These tests do not replace device checks. On each platform verify aspect ratio, tile completion, dice looping, tap-to-close, Home, search, rotation, sound persistence, import preview/save/edit/delete, and error handling. On Android also check Back. Verify long labels, the fixed header and the last row clearing the dice.
