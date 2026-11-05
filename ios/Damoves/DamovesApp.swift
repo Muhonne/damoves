@@ -41,6 +41,7 @@ struct BrowseView: View {
     @AppStorage("soundEnabled") private var sound = true
     @Environment(\.scenePhase) private var phase
     @State private var query = ""
+    @State private var browse = BrowseCore()
     @State private var playback: Playback?
     @State private var editor: EditorSource?
     @State private var filePicker = false
@@ -48,7 +49,20 @@ struct BrowseView: View {
     @State private var deleting: Move?
     @State private var error: String?
 
-    private var filtered: [Move] { store.moves.filter { MoveLogic.matches($0.name, query: query) } }
+    private var filtered: [Move] {
+        let visible = Set(browse.visibleMoves.map(\.id))
+        return store.moves.filter { visible.contains($0.url.absoluteString) }
+    }
+
+    private func updateMoves() {
+        browse.send(.replaceMoves(store.moves.map { BrowseMove(id: $0.url.absoluteString, name: $0.name) }))
+    }
+
+    private func playChoice() {
+        guard let choice = browse.choice,
+              let move = store.moves.first(where: { $0.url.absoluteString == choice.id }) else { return }
+        playback = Playback(move: move, loop: choice.loop)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -60,8 +74,10 @@ struct BrowseView: View {
                         PhotosPicker(selection: $photo, matching: .videos) { Label("Photos", systemImage: "photo") }
                         Button { filePicker = true } label: { Label("Files", systemImage: "folder") }
                     }
-                    Toggle(sound ? "Sound on" : "Sound off", isOn: $sound)
-                        .font(.caption).fixedSize()
+                    Toggle(browse.soundEnabled ? "Sound on" : "Sound off", isOn: Binding(
+                        get: { browse.soundEnabled },
+                        set: { browse.send(.setSound($0)); sound = $0 }
+                    )).font(.caption).fixedSize()
                 }
                 TextField("Search moves", text: $query)
                     .padding(12).background(Color(white: 0.12), in: RoundedRectangle(cornerRadius: 12))
@@ -72,7 +88,7 @@ struct BrowseView: View {
                 ScrollView {
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 3), spacing: 12) {
                         ForEach(filtered) { move in
-                            Button { playback = Playback(move: move, loop: false) } label: { MoveCard(move: move) }
+                            Button { browse.send(.open(move.url.absoluteString)); playChoice() } label: { MoveCard(move: move) }
                                 .buttonStyle(.plain)
                                 .contextMenu {
                                     if move.imported {
@@ -84,7 +100,7 @@ struct BrowseView: View {
                     }.padding(.horizontal, 16).padding(.top, 12).padding(.bottom, 88)
                 }
                 Button {
-                    if let move = store.moves.randomElement() { playback = Playback(move: move, loop: true) }
+                    browse.send(.rollDice); playChoice()
                 } label: {
                     Image(systemName: "die.face.5.fill").font(.title2).foregroundStyle(.black)
                         .frame(width: 56, height: 56).background(Color(red: 0.65, green: 0.71, blue: 0.84), in: Circle())
@@ -92,11 +108,15 @@ struct BrowseView: View {
             }
         }
         .background(Color(red: 0.06, green: 0.07, blue: 0.08))
-        .fullScreenCover(item: $playback) { selection in
-            PlaybackView(selection: selection, sound: sound) { playback = nil; error = "Could not play this video." }
+        .onAppear { updateMoves(); browse.send(.setSound(sound)) }
+        .onChange(of: sound) { browse.send(.setSound($0)) }
+        .onChange(of: store.moves) { _ in updateMoves() }
+        .onChange(of: query) { browse.send(.search($0)) }
+        .fullScreenCover(item: $playback, onDismiss: { browse.send(.clearChoice) }) { selection in
+            PlaybackView(selection: selection, sound: browse.soundEnabled) { playback = nil; error = "Could not play this video." }
         }
         .sheet(item: $editor, onDismiss: { store.reload() }) { source in
-            ImportView(source: source, store: store, sound: sound)
+            ImportView(source: source, store: store, sound: browse.soundEnabled)
         }
         .fileImporter(isPresented: $filePicker, allowedContentTypes: [.movie]) { result in
             do {

@@ -1,0 +1,14 @@
+plugins {
+    id 'org.jetbrains.kotlin.jvm'
+    id 'application'
+}
+
+dependencies { implementation 'com.google.code.gson:gson:2.11.0' }
+
+kotlin {
+    jvmToolchain(25)
+    sourceSets.main.kotlin.srcDir('../app/src/main/java')
+    sourceSets.main.kotlin.include('com/example/soundboard/BrowseCore.kt', 'com/example/soundboard/behavior/**')
+}
+
+application { mainClass = 'com.example.soundboard.behavior.MainKt' }

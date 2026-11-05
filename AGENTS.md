@@ -22,10 +22,11 @@ Help dancers check dance-move videos quickly between songs. Prioritize finding a
 - [README](README.md): what Damoves is, use, adding moves, build, signed release, tests, device checks.
 - [User flows](docs/userflows.md): how each screen behaves, screen by screen, and what happens at the edges.
 - [Android tooling](docs/android-tooling.md): Android Studio, JDK 25, SDK, emulator, and signed device installation workflows.
+- [Behavior tests](docs/behavior-tests.md): shared Reflex-style headless journeys and coverage limits.
 
 ## Validation
 
-For Android changes, run `cd android && ./gradlew :app:testDebugUnitTest :app:assembleDebug :app:lintDebug`. For iOS changes, run `cd ios && swift test` and build the Xcode project for an iOS simulator. For playback or UI changes, check affected behavior on the relevant device or emulator, including completion, tap-to-close, Back (Android), Home, search, rotation, and mute persistence.
+For shared browse behavior or headless test changes, run `./tests/behavior/run.sh`. For Android changes, run `cd android && ./gradlew :app:testDebugUnitTest :app:assembleDebug :app:lintDebug`. For iOS changes, run `cd ios && swift test` and build the Xcode project for an iOS simulator. For playback or UI changes, check affected behavior on the relevant device or emulator, including completion, tap-to-close, Back (Android), Home, search, rotation, and mute persistence.
 For Android release/signing changes, also run `./gradlew :app:assembleRelease :app:lintRelease` from `android/` and verify the APK signature. Keep release signing material outside the repository.
 
 ## Git

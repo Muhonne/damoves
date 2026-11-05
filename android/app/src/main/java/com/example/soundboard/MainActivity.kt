@@ -22,6 +22,7 @@ import android.widget.*
 class MainActivity : Activity() {
     private lateinit var allMoves: List<Move>
     private var moves = emptyList<Move>()
+    private val browse = BrowseCore()
     private val adapter = MoveAdapter()
     private lateinit var searchInput: EditText
     private val thumbnails = mutableMapOf<Move, Bitmap>()
@@ -30,7 +31,7 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         allMoves = discoverMoves(resources) + SavedMoves.load(this)
-        moves = allMoves
+        updateBrowseMoves()
         val root = FrameLayout(this).apply {
             setBackgroundColor(Color.rgb(16, 17, 20))
             applySystemInsets()
@@ -66,18 +67,21 @@ class MainActivity : Activity() {
             addTextChangedListener(object : TextWatcher {
                 override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
                 override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                    moves = filterMoves(allMoves, s.toString())
+                    browse.send(BrowseCore.Action.Search(s.toString()))
+                    refreshVisibleMoves()
                     adapter.notifyDataSetChanged()
                 }
                 override fun afterTextChanged(s: Editable?) {}
             })
         }
         val preferences = getSharedPreferences(SOUND_PREFS, MODE_PRIVATE)
+        browse.send(BrowseCore.Action.SetSound(preferences.getBoolean(KEY_SOUND_ENABLED, true)))
         val toggle = Switch(this).apply {
-            isChecked = preferences.getBoolean(KEY_SOUND_ENABLED, true)
+            isChecked = browse.soundEnabled
             setText(if (isChecked) R.string.sound_on else R.string.sound_off)
             setOnCheckedChangeListener { _, enabled ->
-                preferences.edit().putBoolean(KEY_SOUND_ENABLED, enabled).apply()
+                browse.send(BrowseCore.Action.SetSound(enabled))
+                preferences.edit().putBoolean(KEY_SOUND_ENABLED, browse.soundEnabled).apply()
                 setText(if (enabled) R.string.sound_on else R.string.sound_off)
             }
             textSize = 13f
@@ -95,7 +99,8 @@ class MainActivity : Activity() {
             stretchMode = GridView.STRETCH_COLUMN_WIDTH
             adapter = this@MainActivity.adapter
             setOnItemClickListener { _, _, position, _ ->
-                openMove(moves[position])
+                browse.send(BrowseCore.Action.Open(allMoves.indexOf(moves[position]).toString()))
+                playChoice()
             }
             setOnItemLongClickListener { _, _, position, _ ->
                 val move = moves[position]
@@ -136,7 +141,7 @@ class MainActivity : Activity() {
                 android.content.res.ColorStateList.valueOf(0x33000000), circle, null)
             setPadding(dp(16), dp(16), dp(16), dp(16))
             elevation = dp(6).toFloat()
-            setOnClickListener { allMoves.randomOrNull()?.let { openMove(it, loop = true) } }
+            setOnClickListener { browse.send(BrowseCore.Action.RollDice); playChoice() }
         }
         root.addView(dice, FrameLayout.LayoutParams(dp(56), dp(56), Gravity.BOTTOM or Gravity.END).apply {
             setMargins(dp(16), dp(16), dp(16), dp(16))
@@ -154,9 +159,24 @@ class MainActivity : Activity() {
 
     private fun reloadMoves() {
         allMoves = discoverMoves(resources) + SavedMoves.load(this)
-        moves = filterMoves(allMoves, searchInput.text.toString())
+        updateBrowseMoves()
         adapter.notifyDataSetChanged()
         loadThumbnails()
+    }
+
+    private fun updateBrowseMoves() {
+        browse.send(BrowseCore.Action.ReplaceMoves(allMoves.mapIndexed { index, move -> BrowseMove(index.toString(), move.name) }))
+        refreshVisibleMoves()
+    }
+
+    private fun refreshVisibleMoves() {
+        moves = browse.visibleMoves.mapNotNull { it.id.toIntOrNull()?.let(allMoves::getOrNull) }
+    }
+
+    private fun playChoice() {
+        val choice = browse.choice ?: return
+        val move = choice.id.toIntOrNull()?.let(allMoves::getOrNull) ?: return
+        openMove(move, loop = choice.loop)
     }
 
     @Deprecated("Platform callback")

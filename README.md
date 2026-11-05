@@ -61,4 +61,10 @@ xcodebuild -project Damoves.xcodeproj -scheme Damoves -sdk iphonesimulator CODE_
 
 ## Tests and device checks
 
-Android JVM tests cover search and discovery; iOS Swift package tests cover names, search, and range clamping. They do not replace device checks. On each platform verify aspect ratio, tile completion, dice looping, tap-to-close, Home, search, rotation, sound persistence, import preview/save/edit/delete, and error handling. On Android also check Back. Verify long labels, the fixed header and the last row clearing the dice.
+The same headless behavior journeys run against the Swift and Kotlin browse cores used by the apps, locally and in GitHub Actions on pushes and pull requests. They exercise search, tile selection, dice selection independent of search, and sound state without a simulator. This is a small Reflex-style implementation, not a Shopify library; see [Behavior tests](docs/behavior-tests.md) for the protocol, prerequisites, and coverage limits.
+
+```sh
+./tests/behavior/run.sh
+```
+
+Android JVM tests also cover search and discovery; iOS Swift package tests cover names, search, and range clamping. These tests do not replace device checks. On each platform verify aspect ratio, tile completion, dice looping, tap-to-close, Home, search, rotation, sound persistence, import preview/save/edit/delete, and error handling. On Android also check Back. Verify long labels, the fixed header and the last row clearing the dice.
