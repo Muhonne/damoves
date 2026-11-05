@@ -1,5 +1,9 @@
 .gradle/
 .kotlin/
+.build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
 build/
 */build/
 local.properties
@@ -13,6 +17,7 @@ release.properties
 # Local dance-move videos
 *.[mM][pP]4
 *.[mM]4[vV]
+*.[mM][oO][vV]
 *.[wW][eE][bB][mM]
 *.3[gG][pP]
 *.[mM][kK][vV]

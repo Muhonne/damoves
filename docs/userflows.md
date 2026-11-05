@@ -13,16 +13,16 @@ How Damoves behaves from the dancer's side, screen by screen. The [README](../RE
 1. Tap a tile. The clip opens full screen, keeping its aspect ratio.
 2. Tap the video to close it early.
 3. If you let it run, a tile selection closes itself when the clip finishes.
-4. Pressing Back or Home stops playback and returns to the grid.
+4. On Android, pressing Back or Home stops playback and returns to the grid. On iOS, leaving the app stops and closes playback.
 
 ## Play a random move with the dice
 
 1. Tap the floating dice button to loop a random move from the **full** library. The dice ignores the current search filter.
-2. The same move repeats until you close it. Tap the video, or press Back or Home.
+2. The same move repeats until you close it. Tap the video or leave the app; on Android, Back also closes it.
 
 ## Add a move from a gallery clip
 
-Reached from **Add clip**. The system gallery/document picker supplies the video, so the app needs no broad gallery permission.
+Reached from **Add clip**. The system gallery/document picker supplies the video, so the app needs no broad gallery permission. On iOS choose Photos or Files; the selected video is copied to temporary storage for editing.
 
 1. **Pick a clip.** The picker opens the video file directly in the importer. If a clip cannot be played, an error is shown and the importer closes.
 2. **Choose a range.** Drag either handle on the two-handle timeline; the label above reads `Start x.xx s — End y.yy s`.
@@ -35,8 +35,8 @@ The selection cannot be inverted: the start stays at least one step below the en
 
 ### What saving does
 
-- The selected range is stream-copied into a private MP4 in app storage, so there is no re-encoding and no quality loss.
-- The saved start snaps back to the preceding video keyframe, which can include a little extra footage before your selection.
+- The selected range is exported to a private MP4 using passthrough, without re-encoding.
+- On Android the start snaps back to the preceding video keyframe. On iOS AVFoundation determines the exact passthrough boundaries. The result can include extra footage before the selected start.
 - Export depends on the source codecs; MP4 with H.264 video and AAC audio is the safe choice.
 - The original video is never modified or moved.
 - A move that fails to save reports `Could not save this video. Try an MP4 video.` and leaves you in the importer.
@@ -61,11 +61,11 @@ Editing works on the app's own trimmed copy, not the original gallery video: the
 
 ## Leaving the importer
 
-- Back or Home stops preview playback and discards the import.
+- Cancel or leaving the app stops preview playback and discards the import. On Android, Back also closes the importer. On iOS, a save already in progress is allowed to finish.
 - Rotating the device keeps the chosen range and the typed name.
 
 ## Edge cases
 
 - A clip that cannot be opened, prepared, or played shows a playback error and closes the player.
 - Trimmed imports live in app-private storage; clearing the app's data or uninstalling removes them.
-- Bundled moves stay in the APK and are unaffected by imports.
+- Bundled moves stay in the app package and are unaffected by imports.

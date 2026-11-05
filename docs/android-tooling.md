@@ -3,17 +3,17 @@
 ## Installed workstation setup
 
 - Android Studio Rabbit 1, 2026.2.1 (build `262.9437.185.2621.16467767`). Installed from `~/Downloads/android-studio-rabbit1-linux.tar.gz` into `~/.local/opt/android-studio`.
-- Start from the Android Studio application menu entry, or run `~/.local/opt/android-studio/bin/studio /path/to/damoves`.
+- Start from the Android Studio application menu entry, or run `~/.local/opt/android-studio/bin/studio /path/to/damoves/android`.
 - Bundled Java: `~/.local/opt/android-studio/jbr` (JBR 25). Gradle daemon criteria pin Java 25; the app's bytecode target remains Java 17.
 - SDK: `~/Android/Sdk`. Platform 37 and build tools 36.0.0 are installed; AGP selects its required build tools.
 - Emulator: `Medium_Phone_API_37.0`, with KVM acceleration available on this workstation.
 - Physical device: Pixel 9a. Damoves is installed as a signed, non-debuggable release with all 28 local videos bundled for offline use. It runs without Android Studio or a computer connection.
 
-These paths describe this workstation; keep machine-specific SDK configuration in the ignored `local.properties`. On another machine, install Android Studio and the required SDK packages through its setup wizard and SDK Manager. Do not commit the SDK or IDE installation.
+These paths describe this workstation; keep machine-specific SDK configuration in the ignored `android/local.properties`. On another machine, install Android Studio and the required SDK packages through its setup wizard and SDK Manager. Do not commit the SDK or IDE installation.
 
 ## Open, sync, and build
 
-Open the repository root in Android Studio. Let Gradle sync finish before running `app`. If Run is disabled, inspect the Sync/Build output, confirm SDK platform 37 is installed, and use **File > Sync Project with Gradle Files**. Ensure the Gradle JVM is Java 25; use the bundled JBR rather than an unrelated system Java installation.
+Open the `android/` directory in Android Studio. All commands below are run from `android/`. Let Gradle sync finish before running `app`. If Run is disabled, inspect the Sync/Build output, confirm SDK platform 37 is installed, and use **File > Sync Project with Gradle Files**. Ensure the Gradle JVM is Java 25; use the bundled JBR rather than an unrelated system Java installation.
 
 For command-line builds on this workstation:
 

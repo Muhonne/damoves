@@ -1,83 +1,64 @@
 # Damoves
 
-Damoves is a native Android app for quickly checking dance-move videos between songs. Search for a move, tap its tile, and watch a short clip before returning to the dance floor.
+Damoves is a native Android and iOS app for quickly checking dance-move videos between songs. Search for a move, tap its tile, and watch a short clip before returning to the dance floor. Bundled and imported clips are available offline.
 
-The app uses Kotlin, Android platform views, and `VideoView`. Clips are bundled for offline playback.
-
-The launcher icon pairs the dancing woman and man emoji (💃🕺) from Google Noto Emoji on a muted rainbow gradient with adaptive icon support. Artwork license: `licenses/noto-emoji-LICENSE.txt`.
+Android uses Kotlin, platform views, and `VideoView`; iOS uses SwiftUI and AVFoundation. The Android launcher icon uses Google Noto Emoji; see `licenses/noto-emoji-LICENSE.txt`.
 
 ## Use
 
-- Search the grid by dance-move name and tap a tile to play its video once.
-- Tap the video to close it and return to the grid. Moves opened from a tile close on completion; dice selections repeat. Leaving the app closes playback.
-- Tap the floating dice button to loop a random move from the full library until closed, regardless of the search filter.
-- The sound toggle persists across launches.
-- Tap **Add clip**, select a video with the system gallery/document picker, and choose a range on the two-handle timeline. Fine-tune start/end in 0.5-second steps, preview, enter a move name, and tap **Save move**. A trimmed MP4 is saved privately in the app and appears in the grid, search, and dice selections, available offline. The original is untouched. Uninstalling the app removes imported moves.
-- Trimming uses fast lossless stream copying: the saved start snaps to the preceding video keyframe, so it can include a little extra footage before your selection. Export support depends on the source codecs; MP4 with H.264/AAC is recommended. No broad gallery permission is required.
+- Search the grid by move name and tap a tile to play its video once. Tap the video to close it; leaving the app stops playback.
+- The floating dice loops a random move from the full library, regardless of the search filter. The sound toggle persists across launches.
+- **Add clip** opens the system picker (Photos or Files on iOS). Choose a range, preview it, fine-tune the start/end in 0.5-second steps, enter a name, and save. The private copy appears in the grid, search, and dice; the original is untouched.
+- Long-press an imported move to edit it as a new copy or delete it. Uninstalling the app removes imported moves.
+- Trimming uses fast passthrough export. The saved range can start at an earlier video keyframe. Export support depends on source codecs; MP4 with H.264/AAC is recommended.
 
-See [User flows](docs/userflows.md) for the screen-by-screen behavior, including the clip importer.
+See [User flows](docs/userflows.md) for screen-by-screen behavior and platform differences.
 
-## Add dance moves
+## Add bundled moves
 
-1. Copy each dance-move video into **`app/src/main/res/raw/`**. Use MP4 with H.264 video and AAC audio for broad device compatibility. Use lowercase letters, digits, and underscores in filenames, for example `cross_body_lead.mp4`.
-2. Rebuild and reinstall the app. Bundled videos are discovered automatically and listed alphabetically. No code changes are needed.
+Copy clips to the platform(s) you build, then rebuild and reinstall. No registry or separate thumbnails are needed. Files are ignored by Git; a fresh checkout has no bundled clips.
 
-Video files are ignored by Git; copy your local clips into this folder before building.
+- Android: `android/app/src/main/res/raw/`. Use lowercase letters, digits and underscores, e.g. `cross_body_lead.mp4`. Discovery supports MP4, M4V, WebM, 3GP and MKV; device codec support varies. Labels use Android resource entry names, not packaged file paths, so release packaging cannot shorten them.
+- iOS: `ios/Damoves/Videos/`. The folder is copied into the app bundle, including newly added files automatically. Discovery supports MP4, M4V, MOV and 3GP; actual playback depends on AVFoundation and the codecs. H.264/AAC MP4 is a good choice for both platforms.
 
-Filenames become move names: `cross_body_lead.mp4` appears as **Cross body lead**. Underscores become spaces and the first letter is capitalized. Discovery includes `.mp4`, `.m4v`, `.webm`, `.3gp`, and `.mkv` files; other raw resources are ignored. Actual playback support depends on the device and video codec.
+Underscores become spaces and the first character is capitalized: `cross_body_lead.mp4` becomes **Cross body lead**. Cards extract a frame near the beginning and center-crop it to a 9:12 tile with a wrapping label.
 
-Display names use Android resource entry names, so release packaging can shorten APK file paths without changing move labels.
+## Android build
 
-Cards automatically extract a frame near the beginning of each video in the background. Separate thumbnail images are unnecessary. The grid uses three columns of rounded cards on a dark background. Each preview is 9:12 (width to height) and center-cropped to fill the card width without padding or letterboxing. Move names overlay the bottom of each preview on a translucent dark background and wrap to the height needed for the full name.
-
-The compact title, sound toggle, and search stay above a thin divider. The move grid scrolls within its own area below the header.
-The dice floats over the grid, with enough scroll space to bring the last row above it.
-
-## Build
-
-Requires JDK 25 for the Gradle daemon, Android SDK platform 37, and the SDK build tools selected by AGP. Java/Kotlin bytecode targets Java 17. Configure the SDK through Android Studio or an ignored `local.properties` file containing `sdk.dir=/path/to/android/sdk`. See [Android tooling](docs/android-tooling.md) for the installed Android Studio, SDK, emulator, and Pixel workflows.
+Requires JDK 25 for Gradle, Android SDK platform 37 and AGP's selected build tools. Configure the SDK through Android Studio or ignored `android/local.properties`. Open `android/` in Android Studio. See [Android tooling](docs/android-tooling.md) for SDK, emulator and device workflows.
 
 ```sh
+cd android
 ./gradlew :app:testDebugUnitTest :app:assembleDebug :app:lintDebug
-```
-
-The debug APK is `app/build/outputs/apk/debug/app-debug.apk`.
-
-```sh
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Open the repository in Android Studio to build and run on a device or emulator.
+Gradle 9.6.0, AGP 9.4.1, Kotlin 2.4.21, min SDK 26 and Java 17 bytecode are configured in the project.
 
-## Signed release for a personal device
+### Signed Android release
 
-Release signing reads `~/.local/share/damoves/signing/release.properties`, or the path supplied with `-PdamovesSigningProperties=/absolute/path/release.properties`. This private file contains `storeFile` (absolute keystore path), `storePassword`, `keyAlias`, and `keyPassword`. Keep it and the keystore outside the repository and back them up securely: future updates must use the same signing key.
+Release signing reads `~/.local/share/damoves/signing/release.properties`, or `-PdamovesSigningProperties=/absolute/path/release.properties`. This private file contains `storeFile` (absolute keystore path), `storePassword`, `keyAlias`, and `keyPassword`. Keep it and the keystore outside the repository and back them up securely.
 
 ```sh
+cd android
 ./gradlew :app:assembleRelease :app:lintRelease
 adb -s DEVICE_SERIAL install -r app/build/outputs/apk/release/app-release.apk
 ```
 
-Without signing properties, the release APK is unsigned. A release signed with a different key cannot replace the debug app; uninstall the debug app once before installing the first release (this resets local app settings). Subsequent releases can update it in place. Increase `versionCode` for new releases.
+Without signing properties the APK is unsigned. A differently signed release cannot replace the debug app; uninstalling resets local data. Future updates require the same key and an increased `versionCode`. Verify the signature and readable move labels on the signed release; see [Android tooling](docs/android-tooling.md).
 
-## Setup
+## iOS build
 
-- Android Studio Rabbit 1 (2026.2.1), bundled JBR 25
-- Android Gradle Plugin 9.4.1 with built-in Kotlin support, using Kotlin 2.4.21
-- Gradle 9.6.0 wrapper
-- Gradle daemon JVM 25, pinned in `gradle/gradle-daemon-jvm.properties`
-- Compile/target SDK 37; minimum SDK 26 (Android 8.0)
-- JVM bytecode target 17
-- Kotlin standard library; no third-party UI or playback libraries
+Requires Xcode with the iOS SDK and iOS 16 or later. Open `ios/Damoves.xcodeproj`, select the Damoves scheme and an iOS simulator, and run. To install on a physical device, select your Apple developer team and a unique bundle identifier under Signing & Capabilities; Xcode manages signing. Do not commit personal signing settings.
 
-## Tests
+From the command line with Xcode selected:
 
-`app/src/test/` contains JVM unit tests for move search and filename discovery. They cover partial and case-insensitive matching, whitespace, blank queries, no results, display names, supported extensions, and ignoring non-video files. JUnit is a test-only dependency; these tests do not require an emulator.
+```sh
+cd ios
+swift test
+xcodebuild -project Damoves.xcodeproj -scheme Damoves -sdk iphonesimulator CODE_SIGNING_ALLOWED=NO build
+```
 
-## Device checks
+## Tests and device checks
 
-Verify each clip starts and preserves its aspect ratio. Tile selections should close on completion; dice selections should repeat the same move until closed. Check tap-to-close, Back, Home, rotation, mute persistence, and search restoration after rotation. Verify long labels wrap fully, the header stays separate when scrolling, and the last row scrolls above the floating dice. A failed clip should show an error and close the player.
-
-## Future development
-
-- Support optional `YYYY_MM_DD_` filename prefixes for newest-first sorting, for example `2026_10_25_cross_body_lead.mp4`. Hide the date in the displayed move name and list undated clips alphabetically after dated clips. Sorting currently remains alphabetical.
+Android JVM tests cover search and discovery; iOS Swift package tests cover names, search, and range clamping. They do not replace device checks. On each platform verify aspect ratio, tile completion, dice looping, tap-to-close, Home, search, rotation, sound persistence, import preview/save/edit/delete, and error handling. On Android also check Back. Verify long labels, the fixed header and the last row clearing the dice.
